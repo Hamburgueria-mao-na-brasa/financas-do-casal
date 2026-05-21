@@ -651,3 +651,151 @@ td.amount {
   }
 
 }
+/* MOBILE APP LIMPO */
+
+@media screen and (max-width: 900px){
+
+  body{
+    background:#eef8f5 !important;
+    padding-bottom:86px !important;
+  }
+
+  .shell{
+    padding:18px 16px 105px !important;
+  }
+
+  .topbar{
+    display:block !important;
+    margin-bottom:18px !important;
+  }
+
+  .eyebrow{
+    font-size:14px !important;
+    margin-bottom:6px !important;
+  }
+
+  h1{
+    font-size:34px !important;
+    line-height:1.05 !important;
+    margin-bottom:18px !important;
+  }
+
+  .top-actions{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:10px !important;
+    width:100% !important;
+  }
+
+  .cloud-panel{
+    display:grid !important;
+    grid-template-columns:52px 52px 1fr !important;
+    gap:8px !important;
+    width:100% !important;
+  }
+
+  .cloud-panel .mini-status,
+  .cloud-panel .invite-link{
+    display:none !important;
+  }
+
+  #copy-invite,
+  #logout{
+    width:100% !important;
+    min-height:46px !important;
+    border-radius:14px !important;
+  }
+
+  #copy-invite{
+    grid-column:1 / -1 !important;
+  }
+
+  #logout{
+    grid-column:1 / -1 !important;
+  }
+
+  .field.compact{
+    width:100% !important;
+  }
+
+  .field.compact select{
+    width:100% !important;
+    min-height:48px !important;
+  }
+
+  #reset-data{
+    width:100% !important;
+    min-height:46px !important;
+    border-radius:14px !important;
+  }
+
+  .panel,
+  .metric,
+  .entry-form,
+  .table-wrap,
+  .balance-card{
+    border-radius:18px !important;
+    padding:18px !important;
+  }
+
+  .balance-card{
+    min-height:auto !important;
+    display:block !important;
+  }
+
+  .balance-card strong{
+    font-size:36px !important;
+  }
+
+  .couple-widget{
+    display:none !important;
+  }
+
+  .balance-ring{
+    display:none !important;
+  }
+
+  .entry-form{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:14px !important;
+  }
+
+  .field input,
+  .field select,
+  .field textarea{
+    min-height:52px !important;
+    border-radius:14px !important;
+    font-size:18px !important;
+  }
+
+  .primary,
+  .ghost,
+  .danger{
+    min-height:52px !important;
+    border-radius:14px !important;
+    font-size:18px !important;
+  }
+
+  .summary-grid,
+  .grid-2,
+  .grid-3,
+  .bank-home,
+  .wallet-list{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:14px !important;
+  }
+
+  .tabs{
+    overflow-x:auto !important;
+  }
+
+  .sidebar{
+    border-radius:20px 20px 0 0 !important;
+  }
+
+  .fab{
+    display:none !important;
+  }
+}
