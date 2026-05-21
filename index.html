@@ -9,8 +9,10 @@
     <link rel="icon" href="app-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
   </head>
-  <body>
-    <aside class="sidebar">
+  <body class="auth-locked">
+    <section class="auth-screen" id="auth-screen"></section>
+
+    <aside class="sidebar app-frame">
       <div class="brand">
         <span class="brand-mark">FC</span>
         <div>
@@ -22,14 +24,14 @@
         <button class="tab active" data-view="dashboard" title="Visão geral">⌂ <span>Visão geral</span></button>
         <button class="tab" data-view="entries" title="Lançamentos">＋ <span>Lançamentos</span></button>
         <button class="tab" data-view="cards" title="Cartões">▣ <span>Cartões</span></button>
-        <button class="tab" data-view="accounts" title="Contas">≋ <span>Contas</span></button>
+        <button class="tab" data-view="accounts" title="Carteira">≋ <span>Carteira</span></button>
         <button class="tab" data-view="method" title="50/30/20">◴ <span>50/30/20</span></button>
         <button class="tab" data-view="goals" title="Metas">◇ <span>Metas</span></button>
         <button class="tab" data-view="settings" title="Cadastros">⚙ <span>Cadastros</span></button>
       </nav>
     </aside>
 
-    <main class="shell">
+    <main class="shell app-frame">
       <header class="topbar">
         <div>
           <p class="eyebrow">Baseado na planilha</p>
