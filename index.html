@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#25302f">
+    <title>Finanças do Casal</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="app-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">FC</span>
+        <div>
+          <strong>Finanças do Casal</strong>
+          <small>Controle compartilhado</small>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="Seções">
+        <button class="tab active" data-view="dashboard" title="Visão geral">⌂ <span>Visão geral</span></button>
+        <button class="tab" data-view="entries" title="Lançamentos">＋ <span>Lançamentos</span></button>
+        <button class="tab" data-view="cards" title="Cartões">▣ <span>Cartões</span></button>
+        <button class="tab" data-view="accounts" title="Contas">≋ <span>Contas</span></button>
+        <button class="tab" data-view="method" title="50/30/20">◴ <span>50/30/20</span></button>
+        <button class="tab" data-view="goals" title="Metas">◇ <span>Metas</span></button>
+        <button class="tab" data-view="settings" title="Cadastros">⚙ <span>Cadastros</span></button>
+      </nav>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Baseado na planilha</p>
+          <h1 id="page-title">Visão geral</h1>
+        </div>
+        <div class="top-actions">
+          <label class="field compact">
+            <span>Mês</span>
+            <select id="month-filter"></select>
+          </label>
+          <button class="ghost" id="reset-data" title="Restaurar dados">↺</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboard"></section>
+      <section class="view" id="entries"></section>
+      <section class="view" id="cards"></section>
+      <section class="view" id="accounts"></section>
+      <section class="view" id="method"></section>
+      <section class="view" id="goals"></section>
+      <section class="view" id="settings"></section>
+    </main>
+
+    <template id="empty-state">
+      <div class="empty">
+        <strong>Nenhum item cadastrado</strong>
+        <span>Adicione o primeiro registro no formulário acima.</span>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

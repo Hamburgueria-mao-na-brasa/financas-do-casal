@@ -1,0 +1,17 @@
+{
+  "name": "Finanças do Casal",
+  "short_name": "Finanças",
+  "description": "Controle financeiro de casal baseado na planilha original.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#25302f",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
