@@ -517,3 +517,137 @@ td.amount {
         overflow:hidden;
     }
 }
+/* ================================= */
+/* MOBILE DEFINITIVO */
+/* ================================= */
+
+@media screen and (max-width: 900px){
+
+  body{
+    display:block !important;
+    overflow-x:hidden !important;
+    padding-bottom:90px !important;
+  }
+
+  .sidebar{
+    position:fixed !important;
+
+    bottom:0 !important;
+    left:0 !important;
+    right:0 !important;
+    top:auto !important;
+
+    width:100% !important;
+    height:78px !important;
+    min-height:78px !important;
+
+    padding:8px !important;
+
+    z-index:999999 !important;
+
+    background:#173a37 !important;
+
+    border-top-left-radius:18px;
+    border-top-right-radius:18px;
+  }
+
+  .brand{
+    display:none !important;
+  }
+
+  .tabs{
+    display:flex !important;
+
+    flex-direction:row !important;
+
+    justify-content:space-around !important;
+
+    align-items:center !important;
+
+    width:100% !important;
+    height:100% !important;
+  }
+
+  .tab{
+
+    width:55px !important;
+    height:55px !important;
+
+    min-height:55px !important;
+
+    padding:0 !important;
+    margin:0 !important;
+
+    display:flex !important;
+
+    justify-content:center !important;
+    align-items:center !important;
+
+    font-size:24px !important;
+
+    border-radius:14px !important;
+  }
+
+  .tab span{
+    display:none !important;
+  }
+
+  .shell{
+    width:100% !important;
+
+    margin:0 !important;
+
+    padding:
+      20px
+      16px
+      120px !important;
+  }
+
+  h1{
+    font-size:36px !important;
+  }
+
+  .summary-grid,
+  .grid-2,
+  .grid-3,
+  .bank-home,
+  .entry-form,
+  .wallet-list{
+    grid-template-columns:1fr !important;
+  }
+
+  .topbar{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:14px !important;
+  }
+
+  .top-actions{
+    width:100% !important;
+    flex-wrap:wrap !important;
+  }
+
+  .metric,
+  .panel,
+  .balance-card,
+  .wallet-account,
+  .entry-form{
+    width:100% !important;
+  }
+
+  .field input,
+  .field select,
+  .field textarea,
+  .primary,
+  .ghost,
+  .danger{
+    width:100% !important;
+  }
+
+  .fab{
+    bottom:100px !important;
+    right:18px !important;
+  }
+
+}
