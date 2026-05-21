@@ -1,4 +1,7 @@
 const months = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const SUPABASE_URL = "https://allcnnxedveesyyvqavb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_H1Z7eE29GXki-Txjk2yNTA_IhOiKNpC";
+const cloud = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const seed = {
   selectedMonth: "junho",
@@ -30,6 +33,12 @@ const seed = {
 };
 
 let state = loadState();
+let currentUser = null;
+let householdId = localStorage.getItem("coupleFinanceHouseholdId");
+let householdInviteCode = localStorage.getItem("coupleFinanceInviteCode");
+let cloudReady = false;
+let saveTimer = null;
+let loadingCloud = false;
 
 const qs = (selector, root = document) => root.querySelector(selector);
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -42,6 +51,7 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
+  if (cloudReady && householdId) scheduleCloudSave();
 }
 
 function byMonth(items, month = state.selectedMonth) {
@@ -102,6 +112,7 @@ function pageTitle(view) {
 
 function render() {
   saveState();
+  renderCloudPanel();
   renderMonthFilter();
   renderDashboard();
   renderEntries();
@@ -110,6 +121,186 @@ function render() {
   renderMethod();
   renderGoals();
   renderSettings();
+}
+
+function renderCloudPanel(message = "") {
+  const panel = qs("#cloud-panel");
+  if (!cloud) {
+    panel.innerHTML = `<span class="mini-status">Modo local</span>`;
+    return;
+  }
+
+  if (!currentUser) {
+    panel.innerHTML = `
+      <form id="login-form" class="cloud-panel">
+        <label class="field"><span>E-mail</span><input name="email" type="email" placeholder="voce@email.com" required></label>
+        <button class="primary" type="submit">Entrar</button>
+        ${message ? `<span class="mini-status">${message}</span>` : ""}
+      </form>
+    `;
+    qs("#login-form").addEventListener("submit", sendLoginLink);
+    return;
+  }
+
+  if (!cloudReady) {
+    panel.innerHTML = `
+      <form id="household-form" class="cloud-panel">
+        <label class="field"><span>Código do cofre</span><input name="code" placeholder="Ex: CASAL123"></label>
+        <button class="ghost" name="action" value="join" type="submit">Entrar</button>
+        <button class="primary" name="action" value="create" type="submit">Criar cofre</button>
+        <button class="ghost" id="logout" type="button">Sair</button>
+        ${message ? `<span class="mini-status">${message}</span>` : ""}
+      </form>
+    `;
+    qs("#household-form").addEventListener("submit", handleHousehold);
+    qs("#logout").addEventListener("click", signOut);
+    return;
+  }
+
+  panel.innerHTML = `
+    <span class="mini-status"><i class="dot"></i> Online · Código: <strong>${householdInviteCode}</strong></span>
+    <button class="ghost" id="logout" type="button">Sair</button>
+  `;
+  qs("#logout").addEventListener("click", signOut);
+}
+
+async function sendLoginLink(event) {
+  event.preventDefault();
+  const email = new FormData(event.target).get("email");
+  const { error } = await cloud.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: location.href.split("#")[0] }
+  });
+  renderCloudPanel(error ? error.message : "Veja seu e-mail");
+}
+
+async function signOut() {
+  await cloud.auth.signOut();
+  currentUser = null;
+  cloudReady = false;
+  householdId = null;
+  householdInviteCode = null;
+  localStorage.removeItem("coupleFinanceHouseholdId");
+  localStorage.removeItem("coupleFinanceInviteCode");
+  render();
+}
+
+async function handleHousehold(event) {
+  event.preventDefault();
+  const submitter = event.submitter;
+  const form = new FormData(event.target);
+  if (submitter.value === "create") {
+    await createHousehold();
+  } else {
+    await joinHousehold(form.get("code"));
+  }
+}
+
+function makeInviteCode() {
+  return `CASAL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+async function createHousehold() {
+  loadingCloud = true;
+  renderCloudPanel("Criando...");
+  const id = crypto.randomUUID();
+  const code = makeInviteCode();
+  const { error: householdError } = await cloud.from("households").insert({ id, name: "Finanças do Casal", invite_code: code, created_by: currentUser.id });
+  if (householdError) return renderCloudPanel(householdError.message);
+
+  const { error: memberError } = await cloud.from("household_members").insert({ household_id: id, user_id: currentUser.id, role: "owner" });
+  if (memberError) return renderCloudPanel(memberError.message);
+
+  householdId = id;
+  householdInviteCode = code;
+  cloudReady = true;
+  localStorage.setItem("coupleFinanceHouseholdId", householdId);
+  localStorage.setItem("coupleFinanceInviteCode", householdInviteCode);
+  await saveCloudState();
+  loadingCloud = false;
+  render();
+}
+
+async function joinHousehold(code) {
+  if (!code) return renderCloudPanel("Informe o código");
+  loadingCloud = true;
+  renderCloudPanel("Entrando...");
+  const { data, error } = await cloud.rpc("join_household_by_code", { join_code: code });
+  if (error) return renderCloudPanel(error.message);
+  householdId = data;
+  householdInviteCode = code.trim().toUpperCase();
+  localStorage.setItem("coupleFinanceHouseholdId", householdId);
+  localStorage.setItem("coupleFinanceInviteCode", householdInviteCode);
+  await loadCloudState();
+  loadingCloud = false;
+  render();
+}
+
+async function loadExistingHousehold() {
+  const { data: memberships } = await cloud
+    .from("household_members")
+    .select("household_id")
+    .eq("user_id", currentUser.id)
+    .limit(1);
+
+  if (!memberships?.length) {
+    cloudReady = false;
+    render();
+    return;
+  }
+
+  householdId = memberships[0].household_id;
+  localStorage.setItem("coupleFinanceHouseholdId", householdId);
+  const { data: household } = await cloud.from("households").select("invite_code").eq("id", householdId).single();
+  householdInviteCode = household?.invite_code || householdInviteCode;
+  if (householdInviteCode) localStorage.setItem("coupleFinanceInviteCode", householdInviteCode);
+  await loadCloudState();
+  render();
+}
+
+async function loadCloudState() {
+  const { data, error } = await cloud.from("household_states").select("data").eq("household_id", householdId).single();
+  if (!error && data?.data && Object.keys(data.data).length) {
+    state = data.data;
+    localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
+  } else {
+    cloudReady = true;
+    await saveCloudState();
+  }
+  cloudReady = true;
+}
+
+function scheduleCloudSave() {
+  if (loadingCloud) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveCloudState, 650);
+}
+
+async function saveCloudState() {
+  if (!cloudReady || !householdId) return;
+  await cloud.from("household_states").upsert({
+    household_id: householdId,
+    data: state,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function initCloud() {
+  if (!cloud) {
+    render();
+    return;
+  }
+
+  const { data } = await cloud.auth.getSession();
+  currentUser = data.session?.user || null;
+  cloud.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
+    if (currentUser) loadExistingHousehold();
+    else render();
+  });
+
+  if (currentUser) await loadExistingHousehold();
+  else render();
 }
 
 function renderMonthFilter() {
@@ -480,4 +671,4 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
-render();
+initCloud();

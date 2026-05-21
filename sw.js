@@ -5,7 +5,8 @@ const ASSETS = [
   "./styles.css",
   "./app.js",
   "./manifest.json",
-  "./app-icon.svg"
+  "./app-icon.svg",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
 ];
 
 self.addEventListener("install", (event) => {
@@ -26,11 +27,11 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
     caches.match(event.request).then((cached) =>
-      cached || fetch(event.request).then((response) => {
+      fetch(event.request).then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         return response;
-      })
+      }).catch(() => cached)
     )
   );
 });

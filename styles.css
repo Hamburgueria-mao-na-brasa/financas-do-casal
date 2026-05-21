@@ -129,6 +129,38 @@ h2 {
   gap: 10px;
 }
 
+.cloud-panel {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cloud-panel .field input {
+  min-width: 210px;
+}
+
+.cloud-panel .mini-status {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
 .view { display: none; }
 .view.active { display: grid; gap: 18px; }
 
@@ -462,6 +494,7 @@ td.amount {
 
   .top-actions {
     align-items: stretch;
+    flex-wrap: wrap;
   }
 
   .summary-grid, .grid-3 {
