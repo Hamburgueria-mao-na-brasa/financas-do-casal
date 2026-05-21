@@ -1,4 +1,4 @@
-const months = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+﻿const months = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const SUPABASE_URL = "https://allcnnxedveesyyvqavb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_H1Z7eE29GXki-Txjk2yNTA_IhOiKNpC";
 const cloud = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -14,7 +14,13 @@ const seed = {
   installments: [],
   methodIncome: 0,
   goals: [],
-  notifications: []
+  notifications: [],
+  profile: { personOne: "Ele", personTwo: "Ela" },
+  onboardingDone: false,
+  tutorialDone: false,
+  privacyMode: false,
+  recurring: [],
+  budgets: {}
 };
 
 let state = loadState();
@@ -30,6 +36,20 @@ let syncStatus = "";
 let notificationsOpen = false;
 let lastCloudUpdatedAt = null;
 let cloudPollStarted = false;
+let walletTab = "money";
+let modalMode = null;
+let editingEntryId = null;
+let tutorialStep = 0;
+
+const tutorialSteps = [
+  ["Visão geral", "Veja saldo do mês, entradas, saídas, faturas, alertas e o resumo inteligente."],
+  ["Lançamentos", "Registre entradas, saídas e compras no cartão. Use o botão + para lançar rápido."],
+  ["Nossa Carteira", "Cadastre contas, cartões e rendas como salário. É a base do controle."],
+  ["Cartões", "Acompanhe compras parceladas, fatura atual e próxima fatura."],
+  ["50/30/20", "Planeje renda entre essenciais, investimentos e desejos."],
+  ["Metas", "Acompanhe objetivos do casal, como carro, viagem ou reserva."],
+  ["Cadastros", "Ajuste nomes, categorias, recorrências, orçamento e backup."]
+];
 
 const qs = (selector, root = document) => root.querySelector(selector);
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -53,15 +73,21 @@ function ensureStateShape() {
   state.entries ||= [];
   state.installments ||= [];
   state.goals ||= [];
+  state.profile ||= { personOne: "Ele", personTwo: "Ela" };
+  state.recurring ||= [];
+  state.budgets ||= {};
+  if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
+  if (typeof state.tutorialDone !== "boolean") state.tutorialDone = false;
+  if (typeof state.privacyMode !== "boolean") state.privacyMode = false;
 }
 
-function saveState() {
+function saveState(sync = false) {
   localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
-  if (cloudReady && householdId) scheduleCloudSave();
+  if (sync && cloudReady && householdId) scheduleCloudSave();
 }
 
 async function commitState() {
-  localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
+  saveState(false);
   if (cloudReady && householdId) await saveCloudState();
   render();
 }
@@ -115,7 +141,7 @@ function pageTitle(view) {
     dashboard: "Visão geral",
     entries: "Lançamentos",
     cards: "Cartões",
-    accounts: "Carteira",
+    accounts: "Nossa Carteira",
     method: "Método 50/30/20",
     goals: "Metas financeiras",
     settings: "Cadastros"
@@ -124,18 +150,28 @@ function pageTitle(view) {
 
 function render() {
   ensureStateShape();
-  saveState();
+  saveState(false);
   renderGate();
   if (!currentUser || !cloudReady) return;
   renderCloudPanel();
   renderMonthFilter();
   renderDashboard();
+  renderOnboarding();
   renderEntries();
   renderCards();
   renderAccounts();
   renderMethod();
   renderGoals();
   renderSettings();
+  renderTutorial();
+}
+
+function appPeople() {
+  return [state.profile?.personOne || "Ele", state.profile?.personTwo || "Ela", "Ambos"];
+}
+
+function formatMoney(value) {
+  return state.privacyMode ? "R$ ••••" : money.format(Number(value || 0));
 }
 
 function getInviteParam() {
@@ -272,6 +308,7 @@ function renderCloudPanel(message = "") {
 
   panel.innerHTML = `
     <button class="notif-button" id="toggle-notifications" type="button" title="Notificações">🔔${unreadCount() ? `<b>${unreadCount()}</b>` : ""}</button>
+    <button class="notif-button" id="toggle-privacy" type="button" title="Ocultar valores">${state.privacyMode ? "🙈" : "👁"}</button>
     <span class="mini-status"><i class="dot"></i> Online</span>
     ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
     ${inviteLink ? `<span class="mini-status invite-link" title="${inviteLink}">Convite do companheiro</span>` : ""}
@@ -282,6 +319,10 @@ function renderCloudPanel(message = "") {
   qs("#toggle-notifications").addEventListener("click", () => {
     notificationsOpen = !notificationsOpen;
     renderNotifications();
+  });
+  qs("#toggle-privacy").addEventListener("click", () => {
+    state.privacyMode = !state.privacyMode;
+    commitState();
   });
   qs("#logout").addEventListener("click", signOut);
   qs("#copy-invite").addEventListener("click", copyInviteLink);
@@ -340,6 +381,125 @@ function renderNotifications() {
     notificationsOpen = true;
     renderNotifications();
   });
+}
+
+function renderTutorial() {
+  const modal = qs("#app-modal");
+  if (state.tutorialDone || modalMode) return;
+  modal.classList.add("open");
+  const [title, text] = tutorialSteps[tutorialStep];
+  modal.innerHTML = `
+    <div class="modal-card tutorial-card">
+      <div class="modal-head">
+        <strong>Tour rápido</strong>
+        <button class="ghost tiny" id="skip-tutorial" type="button">Pular</button>
+      </div>
+      <div class="tutorial-body">
+        <span class="tutorial-count">${tutorialStep + 1} de ${tutorialSteps.length}</span>
+        <h2>${title}</h2>
+        <p>${text}</p>
+      </div>
+      <div class="tutorial-actions">
+        <button class="ghost" id="prev-tutorial" type="button" ${tutorialStep === 0 ? "disabled" : ""}>Voltar</button>
+        <button class="primary" id="next-tutorial" type="button">${tutorialStep === tutorialSteps.length - 1 ? "Concluir" : "Próximo"}</button>
+      </div>
+    </div>
+  `;
+  qs("#skip-tutorial").addEventListener("click", finishTutorial);
+  qs("#prev-tutorial").addEventListener("click", () => {
+    tutorialStep = Math.max(0, tutorialStep - 1);
+    renderTutorial();
+  });
+  qs("#next-tutorial").addEventListener("click", () => {
+    if (tutorialStep >= tutorialSteps.length - 1) finishTutorial();
+    else {
+      tutorialStep += 1;
+      renderTutorial();
+    }
+  });
+}
+
+function finishTutorial() {
+  state.tutorialDone = true;
+  qs("#app-modal").classList.remove("open");
+  qs("#app-modal").innerHTML = "";
+  commitState();
+}
+
+function openQuickAdd() {
+  modalMode = "quick";
+  renderModal();
+}
+
+function closeModal() {
+  modalMode = null;
+  qs("#app-modal").classList.remove("open");
+  qs("#app-modal").innerHTML = "";
+}
+
+function renderModal() {
+  const modal = qs("#app-modal");
+  if (!modalMode) return closeModal();
+  modal.classList.add("open");
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Lançamento rápido</strong>
+        <button class="ghost tiny" id="close-modal" type="button">Fechar</button>
+      </div>
+      <form class="auth-actions" id="quick-form">
+        ${select("type", "Tipo", ["Saída", "Entrada", "Cartão"])}
+        ${input("value", "Valor", "number", "", "0.01")}
+        ${input("description", "Descrição", "text", "")}
+        ${select("person", "Quem?", appPeople())}
+        <button class="primary" type="submit">Salvar rápido</button>
+      </form>
+    </div>
+  `;
+  qs("#close-modal").addEventListener("click", closeModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeModal();
+  }, { once: true });
+  qs("#quick-form").addEventListener("submit", saveQuickEntry);
+}
+
+function saveQuickEntry(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  const type = data.type === "Entrada" ? "Receita" : data.type === "Cartão" ? "Cartão" : "Despesa";
+  const today = new Date().toISOString().slice(0, 10);
+  if (type === "Cartão") {
+    state.installments.unshift({
+      id: crypto.randomUUID(),
+      date: today,
+      card: state.cards[0]?.name || "Cartão",
+      description: data.description || "Compra no cartão",
+      category: state.categoriesExpense[0] || "Cartão",
+      value: Number(data.value || 0),
+      parts: 1,
+      firstMonth: months[new Date().getMonth()],
+      paidMonths: []
+    });
+    notify("card", `Compra rápida no cartão · ${formatMoney(Number(data.value || 0))}`);
+  } else {
+    state.entries.unshift({
+      id: crypto.randomUUID(),
+      date: today,
+      month: months[new Date().getMonth()],
+      type,
+      category: type === "Receita" ? state.categoriesIncome[0] : state.categoriesExpense[0],
+      description: data.description || (type === "Receita" ? "Entrada rápida" : "Saída rápida"),
+      value: Number(data.value || 0),
+      person: data.person,
+      payment: type === "Receita" ? "Recebimento" : "Pix",
+      account: accountOptions()[0],
+      status: "Pago",
+      notes: ""
+    });
+    notify("entry", `${data.type} rápida · ${formatMoney(Number(data.value || 0))}`);
+  }
+  closeModal();
+  commitState();
 }
 
 function notificationItem(item) {
@@ -634,6 +794,16 @@ function renderMonthFilter() {
 
 function renderDashboard() {
   const summary = currentSummary();
+  const insights = dashboardInsights(summary);
+  const pending = state.entries
+    .filter((item) => item.status === "Pendente")
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .slice(0, 5);
+  const budgetAlerts = budgetWarnings();
+  const attentionHtml = [
+    ...budgetAlerts.map((item) => `<div class="list-item"><div><strong>${item.category}</strong><span>${item.percent}% do orçamento usado</span></div><b>${formatMoney(item.spent)} / ${formatMoney(item.limit)}</b></div>`),
+    ...pending.map((item) => `<div class="list-item"><div><strong>${item.description || item.category}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`)
+  ].join("");
   const recentEntries = [...state.entries]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 6);
@@ -641,7 +811,7 @@ function renderDashboard() {
     .filter((item) => item.type === "Despesa")
     .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
   const maxCategory = Math.max(1, ...Object.values(categoryTotals));
-  const people = ["Ele", "Ela", "Ambos"].map((name) => {
+  const people = appPeople().map((name) => {
     const personEntries = byMonth(state.entries).filter((item) => item.person === name);
     const income = total(personEntries.filter((item) => item.type === "Receita"));
     const expense = total(personEntries.filter((item) => item.type === "Despesa"));
@@ -653,7 +823,7 @@ function renderDashboard() {
       <div class="balance-card">
         <div>
           <span>Saldo do mês</span>
-          <strong>${money.format(summary.balance)}</strong>
+          <strong>${formatMoney(summary.balance)}</strong>
           <small>${state.selectedMonth} · Conta compartilhada</small>
         </div>
         ${coupleIllustration(summary.balance)}
@@ -665,7 +835,7 @@ function renderDashboard() {
         <button class="action-chip" data-view="entries"><b>＋</b><span>Lançamento</span></button>
         <button class="action-chip" data-view="cards"><b>▣</b><span>Cartão</span></button>
         <button class="action-chip" data-view="goals"><b>◇</b><span>Meta</span></button>
-        <button class="action-chip" data-view="accounts"><b>≋</b><span>Carteira</span></button>
+        <button class="action-chip" data-view="accounts"><b>≋</b><span>Nossa Carteira</span></button>
       </div>
     </section>
     <div class="summary-grid bank-metrics">
@@ -673,6 +843,20 @@ function renderDashboard() {
       ${metric("Saídas", summary.expense, "bad")}
       ${metric("Cartões", summary.cardMonth, "info")}
       ${metric("Saldo devedor", summary.cardDebt, "warn")}
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Resumo inteligente</h2>
+        <div class="insight-grid">
+          ${insights.map((item) => `<div class="insight-card"><span>${item.label}</span><strong>${item.value}</strong><small>${item.note}</small></div>`).join("")}
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Atenção</h2>
+        <div class="list">
+          ${attentionHtml || emptyHtml()}
+        </div>
+      </div>
     </div>
     <div class="grid-2">
       <div class="panel">
@@ -686,8 +870,8 @@ function renderDashboard() {
         <div class="list">
           ${people.map((person) => `
             <div class="list-item">
-              <div><strong>${person.name}</strong><span>Receitas ${money.format(person.income)} · Despesas ${money.format(person.expense)}</span></div>
-              <b>${money.format(person.balance)}</b>
+              <div><strong>${person.name}</strong><span>Receitas ${formatMoney(person.income)} · Despesas ${formatMoney(person.expense)}</span></div>
+              <b>${formatMoney(person.balance)}</b>
             </div>
           `).join("")}
         </div>
@@ -708,6 +892,68 @@ function renderDashboard() {
       </div>
     </div>
   `;
+}
+
+function budgetWarnings() {
+  const monthExpenses = byMonth(state.entries).filter((item) => item.type === "Despesa");
+  return Object.entries(state.budgets || {}).map(([category, limit]) => {
+    const spent = total(monthExpenses.filter((item) => item.category === category));
+    return { category, limit, spent, percent: Math.round((spent / Math.max(1, limit)) * 100) };
+  }).filter((item) => item.limit > 0 && item.percent >= 80);
+}
+
+function dashboardInsights(summary) {
+  const monthEntries = byMonth(state.entries);
+  const expenses = monthEntries.filter((item) => item.type === "Despesa");
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const todaySpent = total(expenses.filter((item) => item.date === todayKey));
+  const biggest = expenses.reduce((max, item) => Number(item.value || 0) > Number(max?.value || 0) ? item : max, null);
+  const categoryTotals = expenses.reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
+  const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const daysLeft = Math.max(1, new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1);
+  return [
+    { label: "Gasto hoje", value: formatMoney(todaySpent), note: "Somente saídas do dia" },
+    { label: "Pode gastar por dia", value: formatMoney(Math.max(0, summary.balance) / daysLeft), note: `${daysLeft} dias restantes no mês` },
+    { label: "Maior gasto", value: biggest ? formatMoney(biggest.value) : formatMoney(0), note: biggest?.description || "Sem gastos no mês" },
+    { label: "Categoria destaque", value: topCategory ? formatMoney(topCategory[1]) : formatMoney(0), note: topCategory?.[0] || "Sem categoria" }
+  ];
+}
+
+function renderOnboarding() {
+  let box = qs("#onboarding-box");
+  if (!cloudReady || state.onboardingDone) {
+    if (box) box.remove();
+    return;
+  }
+
+  const dashboard = qs("#dashboard");
+  if (box) box.remove();
+  box = document.createElement("div");
+  box.id = "onboarding-box";
+  box.className = "panel onboarding";
+  box.innerHTML = `
+    <div>
+      <h2>Primeiros passos</h2>
+      <p>Configure o básico para o controle do casal ficar pronto para uso.</p>
+    </div>
+    <div class="onboarding-steps">
+      ${onboardingStep(state.accounts.length, "Adicionar dinheiro na carteira")}
+      ${onboardingStep(state.cards.length, "Cadastrar um cartão")}
+      ${onboardingStep(state.entries.length || state.installments.length, "Fazer o primeiro lançamento")}
+      ${onboardingStep(householdInviteCode, "Convidar companheiro")}
+    </div>
+    <button class="ghost" id="finish-onboarding" type="button">Ocultar checklist</button>
+  `;
+  dashboard.prepend(box);
+  qs("#finish-onboarding").addEventListener("click", () => {
+    state.onboardingDone = true;
+    notify("sync", "Checklist inicial concluído");
+    commitState();
+  });
+}
+
+function onboardingStep(done, text) {
+  return `<span class="${done ? "done" : ""}">${done ? "✓" : "•"} ${text}</span>`;
 }
 
 function coupleIllustration(balance) {
@@ -740,7 +986,7 @@ function coupleIllustration(balance) {
 }
 
 function metric(label, value, tone) {
-  return `<article class="metric ${tone}"><span>${label}</span><strong>${money.format(value)}</strong></article>`;
+  return `<article class="metric ${tone}"><span>${label}</span><strong>${formatMoney(value)}</strong></article>`;
 }
 
 function statementItem(item) {
@@ -752,17 +998,19 @@ function statementItem(item) {
         <strong>${item.description || item.category}</strong>
         <span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category}</span>
       </div>
-      <b class="${isIncome ? "income" : "expense"}">${isIncome ? "+" : "-"}${money.format(item.value)}</b>
+      <b class="${isIncome ? "income" : "expense"}">${isIncome ? "+" : "-"}${formatMoney(item.value)}</b>
     </div>
   `;
 }
 
 function bar(label, value, max, color) {
   const width = Math.min(100, Math.round((value / max) * 100));
-  return `<div class="bar-row"><span>${label}</span><div class="track"><div class="fill" style="--w:${width}%;--c:${color}"></div></div><strong>${money.format(value)}</strong></div>`;
+  return `<div class="bar-row"><span>${label}</span><div class="track"><div class="fill" style="--w:${width}%;--c:${color}"></div></div><strong>${formatMoney(value)}</strong></div>`;
 }
 
 function renderEntries() {
+  const editing = editingEntryId ? state.entries.find((item) => item.id === editingEntryId) : null;
+  if (editing) entryMode = editing.type;
   const isIncome = entryMode === "Receita";
   const isCard = entryMode === "Cartão";
   qs("#entries").innerHTML = `
@@ -772,38 +1020,82 @@ function renderEntries() {
         <button class="${entryMode === "Despesa" ? "active" : ""}" type="button" data-entry-mode="Despesa">Saída</button>
         <button class="${entryMode === "Cartão" ? "active" : ""}" type="button" data-entry-mode="Cartão">Cartão</button>
       </div>
-      ${input("value", isCard ? "Valor da compra" : "Valor", "number", "", "0.01")}
-      ${input("date", isCard ? "Data da compra" : "Data", "date", new Date().toISOString().slice(0, 10))}
-      ${isCard ? select("card", "Qual cartão?", state.cards.map((item) => item.name)) : ""}
-      ${isCard ? input("parts", "Parcelas", "number", "1", "1") : ""}
-      ${isCard ? select("firstMonth", "Primeiro mês da fatura", months) : ""}
-      ${select("category", isIncome ? "De onde veio?" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense)}
-      ${input("description", isIncome ? "Descrição da entrada" : isCard ? "Nome da compra" : "Descrição da saída", "text", "")}
-      ${select("person", "Quem?", ["Ele", "Ela", "Ambos"])}
-      ${!isCard && !isIncome ? select("payment", "Como foi pago?", state.paymentTypes) : ""}
-      ${!isCard ? select("account", isIncome ? "Carteira que recebeu" : "Carteira usada", accountOptions()) : ""}
-      ${!isCard && !isIncome ? select("status", "Situação", ["Pago", "Pendente"]) : ""}
+      ${input("value", isCard ? "Valor da compra" : "Valor", "number", editing?.value || "", "0.01", "Valor total da entrada, saída ou compra.")}
+      ${input("date", isCard ? "Data da compra" : "Data", "date", editing?.date || new Date().toISOString().slice(0, 10), "", "Data em que aconteceu ou deve acontecer.")}
+      ${isCard ? select("card", "Qual cartão?", state.cards.map((item) => item.name), "", "Cartão onde essa compra entrou.") : ""}
+      ${isCard ? input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas da compra.") : ""}
+      ${isCard ? select("firstMonth", "Primeiro mês da fatura", months, "", "Mês em que a primeira parcela aparece na fatura.") : ""}
+      ${select("category", isIncome ? "De onde veio?" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, "", "Ajuda o app a organizar o resumo por tipo.")}
+      ${input("description", isIncome ? "Descrição da entrada" : isCard ? "Nome da compra" : "Descrição da saída", "text", editing?.description || "", "", "Nome curto para reconhecer depois.")}
+      ${select("person", "Quem?", appPeople(), editing?.person, "Quem recebeu, pagou ou é responsável.")}
+      ${!isCard && !isIncome ? select("payment", "Como foi pago?", state.paymentTypes, "", "Forma de pagamento usada nessa saída.") : ""}
+      ${!isCard ? select("account", isIncome ? "Conta que recebeu" : "Conta de onde saiu", accountOptions(), "", "Conta/carteira onde o dinheiro entrou ou saiu.") : ""}
+      ${!isCard && !isIncome ? select("status", "Situação", ["Pago", "Pendente"], "", "Pago já saiu da conta. Pendente ainda está para pagar.") : ""}
       <label class="field span-2"><span>Observação opcional</span><input name="notes"></label>
-      <button class="primary span-2" type="submit">Salvar lançamento</button>
+      <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
+      ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
     </form>
+    <div class="panel">
+      <h2>Fixos do mês</h2>
+      <div class="list">
+        ${state.recurring.length ? state.recurring.map((item) => `<div class="list-item"><div><strong>${item.description}</strong><span>${item.type === "Receita" ? "Entrada" : "Saída"} · dia ${item.day} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`).join("") : emptyHtml()}
+      </div>
+      <button class="ghost" id="generate-recurring" type="button">Gerar fixos deste mês</button>
+    </div>
     ${table(["Data", "Tipo", "Categoria", "Descrição", "Valor", "Quem", "Situação", ""], state.entries.map((item) => [
       dateFmt.format(new Date(`${item.date}T00:00:00Z`)),
       pill(item.type === "Receita" ? "Entrada" : "Saída", item.type.toLowerCase()),
       item.category,
       item.description,
-      `<td class="amount">${money.format(item.value)}</td>`,
+      `<td class="amount">${formatMoney(item.value)}</td>`,
       pill(item.person, item.person.toLowerCase()),
       pill(item.status, item.status.toLowerCase()),
-      `<button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
+      `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
     ]))}
   `;
   qs("#entry-form").addEventListener("submit", addEntry);
+  qs("#generate-recurring").addEventListener("click", generateRecurring);
+  const cancel = qs("#cancel-edit");
+  if (cancel) cancel.addEventListener("click", () => {
+    editingEntryId = null;
+    renderEntries();
+  });
   document.querySelectorAll("[data-entry-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       entryMode = button.dataset.entryMode;
       renderEntries();
     });
   });
+}
+
+function generateRecurring() {
+  const year = new Date().getFullYear();
+  const month = new Date().getMonth();
+  const monthName = months[month];
+  let created = 0;
+  state.recurring.forEach((item) => {
+    const date = new Date(year, month, Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
+    const exists = state.entries.some((entry) => entry.recurringId === item.id && entry.month === monthName);
+    if (exists) return;
+    state.entries.unshift({
+      id: crypto.randomUUID(),
+      recurringId: item.id,
+      date,
+      month: monthName,
+      type: item.type,
+      category: item.category,
+      description: item.description,
+      value: Number(item.value || 0),
+      person: item.person,
+      payment: item.type === "Receita" ? "Recebimento" : "Pix",
+      account: item.account || accountOptions()[0],
+      status: item.status || "Pendente",
+      notes: "Gerado automaticamente"
+    });
+    created += 1;
+  });
+  notify("sync", `${created} fixos gerados para ${monthName}`);
+  commitState();
 }
 
 function addEntry(event) {
@@ -821,13 +1113,13 @@ function addEntry(event) {
       firstMonth: data.firstMonth,
       paidMonths: []
     });
-    notify("card", `Compra no cartão: ${data.description || data.card} · ${money.format(Number(data.value || 0))}`);
+    notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
     commitState();
     return;
   }
 
-  state.entries.unshift({
-    id: crypto.randomUUID(),
+  const payload = {
+    id: editingEntryId || crypto.randomUUID(),
     date: data.date,
     month: months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()],
     type: entryMode,
@@ -839,8 +1131,15 @@ function addEntry(event) {
     account: data.account,
     status: data.status || "Pago",
     notes: data.notes
-  });
-  notify("entry", `${entryMode === "Receita" ? "Entrada" : "Saída"} registrada: ${data.description || data.category} · ${money.format(Number(data.value || 0))}`);
+  };
+  if (editingEntryId) {
+    state.entries = state.entries.map((item) => item.id === editingEntryId ? payload : item);
+    editingEntryId = null;
+    notify("entry", `Lançamento editado: ${data.description || data.category}`);
+  } else {
+    state.entries.unshift(payload);
+    notify("entry", `${entryMode === "Receita" ? "Entrada" : "Saída"} registrada: ${data.description || data.category} · ${formatMoney(Number(data.value || 0))}`);
+  }
   commitState();
 }
 
@@ -850,55 +1149,74 @@ function accountOptions() {
 
 function renderCards() {
   qs("#cards").innerHTML = `
-    <form class="entry-form guided-form" id="new-card-form-main">
-      ${input("name", "Nome do cartão", "text", "")}
-      ${input("limit", "Limite total", "number", "0", "0.01")}
-      ${select("color", "Cor", ["Verde", "Azul", "Roxo", "Dourado", "Preto"])}
-      <button class="primary" type="submit">Cadastrar cartão</button>
-    </form>
+    <div class="panel helper-panel">
+      <h2>Compras no cartão</h2>
+      <p>Use esta tela para lançar compras parceladas e acompanhar as faturas. Para criar ou alterar cartões, vá em <strong>Nossa Carteira</strong>.</p>
+    </div>
     <form class="entry-form" id="card-form">
-      ${select("card", "Cartão", cardOptions())}
-      ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10))}
-      ${input("description", "Descrição", "text", "")}
-      ${select("category", "Categoria", state.categoriesExpense)}
-      ${input("value", "Valor da compra", "number", "", "0.01")}
-      ${input("parts", "Parcelas", "number", "1", "1")}
-      ${select("firstMonth", "Primeiro mês", months)}
+      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada.")}
+      ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
+      ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
+      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria da compra para relatórios.")}
+      ${input("value", "Valor da compra", "number", "", "0.01", "Valor total, antes de dividir em parcelas.")}
+      ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
+      ${select("firstMonth", "Primeiro mês", months, "", "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Adicionar</button>
     </form>
     <div class="grid-3">
-      ${state.cards.map((card) => {
-        const totals = cardTotals(card.name);
-        const available = Number(card.limit || 0) - totals.used;
-        const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
-        return `<article class="credit-card ${card.color || "Verde"}">
-          <div>
-            <span>Crédito</span>
-            <strong>${card.name}</strong>
-          </div>
-          <div class="card-chip"></div>
-          <div class="card-lines">
-            <span>Limite total</span><b>${money.format(card.limit)}</b>
-            <span>Disponível</span><b>${money.format(available)}</b>
-            <span>Fatura do mês</span><b>${money.format(totals.month)}</b>
-          </div>
-          <div class="track card-track"><div class="fill" style="--w:${percent}%;--c:rgba(255,255,255,.88)"></div></div>
-          <button class="tiny danger" data-delete-card="${card.id}">Excluir cartão</button>
-        </article>`;
-      }).join("") || emptyHtml()}
+      ${state.cards.map(cardSummary).join("") || emptyHtml()}
+    </div>
+    <div class="panel">
+      <h2>Faturas por cartão</h2>
+      <div class="list">
+        ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
+      </div>
     </div>
     ${table(["Compra", "Cartão", "Categoria", "Valor", "Parcelas", "1º mês", ""], state.installments.map((item) => [
       item.description,
       item.card,
       item.category,
-      `<td class="amount">${money.format(item.value)}</td>`,
+      `<td class="amount">${formatMoney(item.value)}</td>`,
       item.parts,
       item.firstMonth,
       `<button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
     ]))}
   `;
-  qs("#new-card-form-main").addEventListener("submit", addCard);
   qs("#card-form").addEventListener("submit", addInstallment);
+}
+
+function cardInvoiceRow(card) {
+  const totals = cardTotals(card.name);
+  const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
+  return `
+    <div class="list-item">
+      <div>
+        <strong>${card.name}</strong>
+        <span>Atual ${formatMoney(totals.month)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+      </div>
+      <button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>
+    </div>
+  `;
+}
+
+function cardSummary(card) {
+  const totals = cardTotals(card.name);
+  const available = Number(card.limit || 0) - totals.used;
+  const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
+  return `<article class="credit-card ${card.color || "Verde"}">
+    <div>
+      <span>Cartão de crédito</span>
+      <strong>${card.name}</strong>
+    </div>
+    <div class="card-chip"></div>
+    <div class="card-lines">
+      <span>Limite total</span><b>${formatMoney(card.limit)}</b>
+      <span>Disponível</span><b>${formatMoney(available)}</b>
+      <span>Fatura do mês</span><b>${formatMoney(totals.month)}</b>
+    </div>
+    <div class="track card-track"><div class="fill" style="--w:${percent}%;--c:rgba(255,255,255,.88)"></div></div>
+    <button class="tiny danger" data-delete-card="${card.id}">Excluir cartão</button>
+  </article>`;
 }
 
 function cardOptions() {
@@ -920,35 +1238,97 @@ function addInstallment(event) {
     firstMonth: data.firstMonth,
     paidMonths: []
   });
-  notify("card", `Compra no cartão: ${data.description || data.card} · ${money.format(Number(data.value || 0))}`);
+  notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
 
 function renderAccounts() {
   qs("#accounts").innerHTML = `
-    <form class="entry-form" id="account-form">
-      ${input("name", "Nome na carteira", "text", "")}
-      ${select("type", "Tipo", ["Corrente", "Poupança", "Digital", "Investimento"])}
-      ${select("owner", "Titular", ["Ele", "Ela", "Ambos"])}
-      ${input("initial", "Saldo inicial", "number", "0", "0.01")}
-      <button class="primary" type="submit">Adicionar à carteira</button>
+    <div class="panel helper-panel">
+      <h2>Nossa Carteira</h2>
+      <p>Cadastre as contas onde o dinheiro fica e os cartões usados nas compras do casal.</p>
+    </div>
+    <div class="mode-picker wallet-tabs" role="tablist" aria-label="Carteira">
+      <button class="${walletTab === "money" ? "active" : ""}" type="button" data-wallet-tab="money">Dinheiro</button>
+      <button class="${walletTab === "cards" ? "active" : ""}" type="button" data-wallet-tab="cards">Cartões</button>
+    </div>
+    <div class="${walletTab === "money" ? "" : "hidden"}">
+    <form class="entry-form guided-form" id="account-form">
+      <div class="span-3"><h2>Adicionar conta</h2></div>
+      ${input("name", "Nome da conta", "text", "", "", "Ex: Nubank, Itaú, Caixa, Dinheiro em casa.")}
+      ${select("type", "Tipo", ["Corrente", "Poupança", "Digital", "Investimento", "Dinheiro"], "", "Ajuda a identificar que tipo de dinheiro é esse.")}
+      ${select("owner", "Titular", appPeople(), "", "Quem é responsável por essa conta ou carteira.")}
+      ${input("initial", "Saldo inicial", "number", "0", "0.01", "Quanto já tinha nessa conta antes de começar a usar o app.")}
+      <button class="primary" type="submit">Salvar conta</button>
     </form>
-    ${table(["Carteira", "Tipo", "Titular", "Entradas", "Saídas", "Saldo atual", ""], state.accounts.map((account) => {
-      const paid = state.entries.filter((item) => item.account === account.name && item.status === "Pago");
-      const income = total(paid.filter((item) => item.type === "Receita"));
-      const expense = total(paid.filter((item) => item.type === "Despesa"));
-      return [
-        account.name,
-        account.type,
-        account.owner,
-        money.format(income),
-        money.format(expense),
-        `<td class="amount">${money.format(Number(account.initial || 0) + income - expense)}</td>`,
-        `<button class="tiny danger" data-delete-account="${account.id}">Excluir</button>`
-      ];
-    }))}
+    <form class="entry-form guided-form" id="income-form">
+      <div class="span-3"><h2>Adicionar renda</h2></div>
+      ${select("category", "Tipo de renda", state.categoriesIncome, "", "Ex: salário, renda extra, pix recebido.")}
+      ${input("description", "Descrição", "text", "Salário", "", "Nome fácil para reconhecer essa renda.")}
+      ${input("value", "Valor", "number", "0", "0.01", "Valor que entra na conta.")}
+      ${select("person", "Quem recebe?", appPeople(), "", "Pessoa que recebeu essa renda.")}
+      ${select("account", "Conta que recebeu", accountOptions(), "", "Onde o dinheiro entrou.")}
+      ${input("day", "Dia do mês", "number", "5", "1", "Se for recorrente, esse é o dia em que costuma cair.")}
+      ${select("recurring", "Repetir todo mês?", ["Sim", "Não"], "Sim", "Use Sim para salário e rendas fixas.")}
+      <button class="primary" type="submit">Salvar renda</button>
+    </form>
+    </div>
+    <div class="${walletTab === "cards" ? "" : "hidden"}">
+    <form class="entry-form guided-form" id="new-card-form-main">
+      <div class="span-3"><h2>Adicionar cartão de crédito</h2></div>
+      ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Neon, Inter, cartão do mercado.")}
+      ${input("limit", "Limite total", "number", "0", "0.01", "Limite aprovado no cartão de crédito.")}
+      ${select("color", "Cor", ["Verde", "Azul", "Roxo", "Dourado", "Preto"], "", "Só muda a aparência do cartão no app.")}
+      <button class="primary" type="submit">Adicionar cartão</button>
+    </form>
+    </div>
+    <div>
+      <div class="panel ${walletTab === "money" ? "" : "hidden"}">
+        <h2>Contas cadastradas</h2>
+        <div class="wallet-list">
+          ${state.accounts.length ? state.accounts.map(accountCard).join("") : emptyHtml()}
+        </div>
+      </div>
+      <div class="panel ${walletTab === "cards" ? "" : "hidden"}">
+        <h2>Cartões de crédito</h2>
+        <div class="wallet-cards">${state.cards.map(cardSummary).join("") || emptyHtml()}</div>
+      </div>
+    </div>
   `;
   qs("#account-form").addEventListener("submit", addAccount);
+  qs("#income-form").addEventListener("submit", addIncome);
+  qs("#new-card-form-main").addEventListener("submit", addCard);
+  document.querySelectorAll("[data-wallet-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      walletTab = button.dataset.walletTab;
+      renderAccounts();
+    });
+  });
+}
+
+function accountCard(account) {
+  const paid = state.entries.filter((item) => item.account === account.name && item.status === "Pago");
+  const income = total(paid.filter((item) => item.type === "Receita"));
+  const expense = total(paid.filter((item) => item.type === "Despesa"));
+  const balance = Number(account.initial || 0) + income - expense;
+  return `
+    <article class="wallet-account">
+      <div>
+        <span>${account.type}</span>
+        <strong>${account.name}</strong>
+        <small>Titular: ${account.owner}</small>
+      </div>
+      <div class="wallet-account-money">
+        <span>Saldo atual</span>
+        <strong>${formatMoney(balance)}</strong>
+      </div>
+      <div class="wallet-account-flow">
+        <span>Entradas ${formatMoney(income)}</span>
+        <span>Saídas ${formatMoney(expense)}</span>
+      </div>
+      <button class="tiny danger" data-delete-account="${account.id}">Excluir</button>
+    </article>
+  `;
 }
 
 function addAccount(event) {
@@ -956,6 +1336,42 @@ function addAccount(event) {
   const data = Object.fromEntries(new FormData(event.target));
   state.accounts.push({ id: crypto.randomUUID(), name: data.name, type: data.type, owner: data.owner, initial: Number(data.initial || 0) });
   notify("account", `Carteira adicionada: ${data.name}`);
+  commitState();
+}
+
+function addIncome(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  const today = new Date();
+  const date = new Date(today.getFullYear(), today.getMonth(), Math.min(Number(data.day || today.getDate()), 28)).toISOString().slice(0, 10);
+  if (data.recurring === "Sim") {
+    state.recurring.push({
+      id: crypto.randomUUID(),
+      type: "Receita",
+      description: data.description,
+      value: Number(data.value || 0),
+      day: Number(data.day || 1),
+      category: data.category,
+      person: data.person,
+      account: data.account,
+      status: "Pago"
+    });
+  }
+  state.entries.unshift({
+    id: crypto.randomUUID(),
+    date,
+    month: months[today.getMonth()],
+    type: "Receita",
+    category: data.category,
+    description: data.description,
+    value: Number(data.value || 0),
+    person: data.person,
+    payment: "Recebimento",
+    account: data.account,
+    status: "Pago",
+    notes: data.recurring === "Sim" ? "Renda recorrente" : ""
+  });
+  notify("entry", `Renda adicionada: ${data.description} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
 
@@ -976,7 +1392,7 @@ function renderMethod() {
         <div class="method-row">
           <b style="color:${color}">${percent}</b>
           <span>${label}</span>
-          <strong>${money.format(value)}</strong>
+          <strong>${formatMoney(value)}</strong>
         </div>
       `).join("")}
     </div>
@@ -1008,7 +1424,7 @@ function goalCard(goal) {
   const percent = Math.min(100, Math.round((Number(goal.saved || 0) / Math.max(1, Number(goal.target || 0))) * 100));
   return `<article class="panel progress-line">
     <h2>${goal.title}</h2>
-    <div class="progress-meta"><span>${money.format(goal.saved)} de ${money.format(goal.target)}</span><strong>${percent}%</strong></div>
+    <div class="progress-meta"><span>${formatMoney(goal.saved)} de ${formatMoney(goal.target)}</span><strong>${percent}%</strong></div>
     <div class="track"><div class="fill" style="--w:${percent}%;--c:${percent >= 100 ? "#1f7a5b" : "#af7b20"}"></div></div>
     <div class="progress-meta"><span>${goal.due ? dateFmt.format(new Date(`${goal.due}T00:00:00Z`)) : "Sem data"}</span>${pill(goal.status, goal.status === "Concluído" ? "done" : "")}</div>
     <button class="tiny danger" data-delete-goal="${goal.id}">Excluir</button>
@@ -1025,6 +1441,12 @@ function addGoal(event) {
 
 function renderSettings() {
   qs("#settings").innerHTML = `
+    <form class="settings-form" id="profile-form">
+      <div class="span-3"><h2>Perfil do casal</h2></div>
+      ${input("personOne", "Primeira pessoa", "text", state.profile.personOne || "Ele")}
+      ${input("personTwo", "Segunda pessoa", "text", state.profile.personTwo || "Ela")}
+      <button class="primary" type="submit">Salvar nomes</button>
+    </form>
     <div class="grid-2">
       <div class="panel">
         <h2>Categorias de receitas</h2>
@@ -1035,21 +1457,104 @@ function renderSettings() {
         <div class="list">${state.categoriesExpense.map((item) => `<div class="list-item"><strong>${item}</strong></div>`).join("")}</div>
       </div>
     </div>
-    <div class="grid-2">
-      <form class="entry-form" id="category-form">
+    <div class="settings-stack">
+      <form class="settings-form" id="category-form">
+        <div class="span-3"><h2>Nova categoria</h2></div>
         ${select("kind", "Tipo", ["Receita", "Despesa"])}
         ${input("name", "Nova categoria", "text", "")}
         <button class="primary" type="submit">Adicionar</button>
       </form>
-      <form class="entry-form" id="new-card-form">
-        ${input("name", "Cartão", "text", "")}
-        ${input("limit", "Limite", "number", "0", "0.01")}
-        <button class="primary" type="submit">Adicionar</button>
+      <form class="settings-form" id="recurring-form">
+        <div class="span-3"><h2>Receitas e despesas fixas</h2></div>
+        ${select("type", "Tipo", ["Despesa", "Receita"])}
+        ${input("description", "Descrição", "text", "")}
+        ${input("value", "Valor", "number", "0", "0.01")}
+        ${input("day", "Dia do mês", "number", "1", "1")}
+        ${select("category", "Categoria", [...state.categoriesExpense, ...state.categoriesIncome])}
+        ${select("person", "Quem?", appPeople())}
+        <button class="primary form-submit" type="submit">Salvar fixo</button>
       </form>
+      <form class="settings-form" id="budget-form">
+        <div class="span-3"><h2>Orçamento por categoria</h2></div>
+        ${select("category", "Categoria", state.categoriesExpense)}
+        ${input("limit", "Limite mensal", "number", "0", "0.01")}
+        <button class="primary form-submit" type="submit">Salvar limite</button>
+      </form>
+      <div class="panel">
+        <h2>Backup</h2>
+        <div class="list">
+          <button class="ghost" id="export-data" type="button">Exportar dados</button>
+          <label class="field"><span>Importar backup</span><input id="import-data" type="file" accept="application/json"></label>
+        </div>
+      </div>
     </div>
   `;
+  qs("#profile-form").addEventListener("submit", saveProfile);
   qs("#category-form").addEventListener("submit", addCategory);
-  qs("#new-card-form").addEventListener("submit", addCard);
+  qs("#recurring-form").addEventListener("submit", addRecurring);
+  qs("#budget-form").addEventListener("submit", saveBudget);
+  qs("#export-data").addEventListener("click", exportData);
+  qs("#import-data").addEventListener("change", importData);
+}
+
+function addRecurring(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  state.recurring.push({
+    id: crypto.randomUUID(),
+    type: data.type,
+    description: data.description,
+    value: Number(data.value || 0),
+    day: Number(data.day || 1),
+    category: data.category,
+    person: data.person,
+    status: data.type === "Receita" ? "Pago" : "Pendente"
+  });
+  notify("sync", `Fixo cadastrado: ${data.description}`);
+  commitState();
+}
+
+function saveBudget(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  state.budgets[data.category] = Number(data.limit || 0);
+  notify("sync", `Orçamento salvo: ${data.category}`);
+  commitState();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `financas-do-casal-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      state = JSON.parse(reader.result);
+      ensureStateShape();
+      notify("sync", "Backup importado");
+      commitState();
+    } catch {
+      alert("Arquivo inválido.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function saveProfile(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  state.profile = { personOne: data.personOne, personTwo: data.personTwo };
+  notify("sync", "Perfil do casal atualizado");
+  commitState();
 }
 
 function addCategory(event) {
@@ -1065,16 +1570,20 @@ function addCard(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
   state.cards.push({ id: crypto.randomUUID(), name: data.name, limit: Number(data.limit || 0), color: data.color || "Verde" });
-  notify("card", `Cartão cadastrado: ${data.name} · limite ${money.format(Number(data.limit || 0))}`);
+  notify("card", `Cartão cadastrado: ${data.name} · limite ${formatMoney(Number(data.limit || 0))}`);
   commitState();
 }
 
-function input(name, label, type, value = "", step = "") {
-  return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${value}" ${step ? `step="${step}"` : ""} required></label>`;
+function labelWithHelp(label, help = "") {
+  return `${label}${help ? `<button class="help-dot" type="button" title="${help}" aria-label="${help}">?</button>` : ""}`;
 }
 
-function select(name, label, options) {
-  return `<label class="field"><span>${label}</span><select name="${name}">${options.map((option) => `<option>${option}</option>`).join("")}</select></label>`;
+function input(name, label, type, value = "", step = "", help = "") {
+  return `<label class="field"><span>${labelWithHelp(label, help)}</span><input name="${name}" type="${type}" value="${value}" ${step ? `step="${step}"` : ""} required></label>`;
+}
+
+function select(name, label, options, selected = "", help = "") {
+  return `<label class="field"><span>${labelWithHelp(label, help)}</span><select name="${name}">${options.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
 }
 
 function categoryOptions(type) {
@@ -1112,10 +1621,31 @@ document.addEventListener("click", (event) => {
   ];
   for (const [datasetKey, stateKey] of deleteMap) {
     if (event.target.dataset[datasetKey]) {
+      if (!confirm("Tem certeza que deseja excluir este item?")) return;
       state[stateKey] = state[stateKey].filter((item) => item.id !== event.target.dataset[datasetKey]);
       notify("sync", "Item removido");
       commitState();
     }
+  }
+
+  if (event.target.dataset.editEntry) {
+    editingEntryId = event.target.dataset.editEntry;
+    document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === "entries"));
+    document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === "entries"));
+    qs("#page-title").textContent = pageTitle("entries");
+    renderEntries();
+  }
+
+  if (event.target.dataset.payCardMonth) {
+    const cardName = event.target.dataset.payCardMonth;
+    state.installments = state.installments.map((item) => {
+      if (item.card !== cardName) return item;
+      const schedule = getInstallmentSchedule(item);
+      if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
+      return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] };
+    });
+    notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
+    commitState();
   }
 });
 
@@ -1135,4 +1665,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+qs("#quick-add").addEventListener("click", openQuickAdd);
 initCloud();
+

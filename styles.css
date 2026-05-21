@@ -707,6 +707,211 @@ h2 {
   transition: transform .18s ease, box-shadow .18s ease;
 }
 
+.helper-panel {
+  background: linear-gradient(135deg, #ffffff, #f2fbf7);
+}
+
+.helper-panel p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.entry-form h2 {
+  margin: 0;
+}
+
+.wallet-cards {
+  display: grid;
+  gap: 14px;
+}
+
+.wallet-cards .credit-card {
+  min-height: 230px;
+}
+
+.wallet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.wallet-account {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, #ffffff, #f6fffb);
+  box-shadow: 0 14px 30px rgba(22, 52, 47, .08);
+}
+
+.wallet-account span,
+.wallet-account small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wallet-account strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.wallet-account-money {
+  padding: 12px;
+  border-radius: 14px;
+  background: #eafaf3;
+}
+
+.wallet-account-money strong {
+  color: var(--green-dark);
+}
+
+.wallet-account-flow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wallet-account-flow span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #edf5f2;
+  font-weight: 700;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.wallet-tabs {
+  max-width: 520px;
+}
+
+.fab {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  border-radius: 22px;
+  color: white;
+  background: linear-gradient(135deg, var(--green), var(--blue));
+  box-shadow: 0 20px 42px rgba(0, 120, 90, .28);
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  place-items: center;
+  padding: 18px;
+  background: rgba(10, 26, 28, .48);
+}
+
+.modal-backdrop.open {
+  display: grid;
+}
+
+.modal-card {
+  width: min(440px, 100%);
+  background: var(--panel);
+  border-radius: 20px;
+  box-shadow: 0 28px 70px rgba(10, 26, 28, .28);
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #f7fffb;
+}
+
+.tutorial-card {
+  max-width: 480px;
+}
+
+.tutorial-body {
+  padding: 24px;
+}
+
+.tutorial-count {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--green-dark);
+  background: #d8f5e7;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tutorial-body h2 {
+  margin: 16px 0 10px;
+}
+
+.tutorial-body p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.onboarding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.onboarding p {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.onboarding-steps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.onboarding-steps span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #edf5f2;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.onboarding-steps span.done {
+  background: #d8f5e7;
+  color: #066447;
+}
+
 .bars {
   display: grid;
   gap: 12px;
@@ -739,6 +944,35 @@ h2 {
   gap: 12px;
   padding: 16px;
   align-items: end;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.settings-form h2 {
+  margin: 0;
+}
+
+.settings-form .span-3 {
+  grid-column: 1 / -1;
+}
+
+.settings-form .form-submit {
+  min-width: 170px;
 }
 
 .guided-form {
@@ -783,6 +1017,27 @@ h2 {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.help-dot {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--blue);
+  background: #e9f2ff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: help;
+}
+
+.help-dot:focus {
+  outline: 2px solid rgba(22, 119, 255, .35);
+  outline-offset: 2px;
 }
 
 .field input, .field select, .field textarea {
@@ -1000,6 +1255,32 @@ td.amount {
   box-shadow: none;
 }
 
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.insight-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfffd;
+}
+
+.insight-card span,
+.insight-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.insight-card strong {
+  display: block;
+  margin: 6px 0;
+  font-size: 21px;
+}
+
 .credit-card {
   min-height: 260px;
   display: grid;
@@ -1151,13 +1432,19 @@ td.amount {
 @media (max-width: 720px) {
   body {
     display: block;
+    padding-bottom: 76px;
   }
 
   .sidebar {
-    min-height: auto;
-    position: sticky;
+    min-height: 0;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
     z-index: 10;
-    padding: 10px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255, 255, 255, .12);
   }
 
   .brand {
@@ -1165,26 +1452,59 @@ td.amount {
   }
 
   .tabs {
-    display: flex;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(44px, 1fr));
+    gap: 3px;
+    overflow: visible;
   }
 
   .tab {
-    min-width: 44px;
+    min-width: 0;
+    min-height: 54px;
+    padding: 6px 4px;
+    border-radius: 12px;
+    font-size: 18px;
+  }
+
+  .tab.active {
+    box-shadow: inset 0 3px 0 #00d084;
+    transform: none;
   }
 
   .shell {
-    padding: 16px;
+    padding: 14px;
   }
 
   .topbar {
     align-items: stretch;
     flex-direction: column;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 30px;
   }
 
   .top-actions {
     align-items: stretch;
     flex-wrap: wrap;
+  }
+
+  .cloud-panel {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .cloud-panel .mini-status,
+  .cloud-panel .ghost,
+  .notif-button {
+    min-height: 38px;
+  }
+
+  .field.compact,
+  .field.compact select {
+    width: 100%;
+    min-width: 0;
   }
 
   .notifications-panel {
@@ -1194,13 +1514,37 @@ td.amount {
     width: auto;
   }
 
+  .fab {
+    right: 16px;
+    bottom: 92px;
+  }
+
+  .onboarding {
+    grid-template-columns: 1fr;
+  }
+
   .summary-grid, .grid-3 {
     grid-template-columns: 1fr;
+  }
+
+  .bank-home {
+    gap: 12px;
+  }
+
+  .balance-card {
+    min-height: 0;
+    padding: 22px;
+    border-radius: 18px;
+  }
+
+  .balance-card strong {
+    font-size: 40px;
   }
 
   .quick-actions {
     grid-template-columns: repeat(4, minmax(72px, 1fr));
     overflow-x: auto;
+    padding-bottom: 4px;
   }
 
   .action-chip {
@@ -1227,6 +1571,10 @@ td.amount {
     grid-template-columns: 40px minmax(0, 1fr);
   }
 
+  .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .statement-item b {
     grid-column: 2;
   }
@@ -1234,5 +1582,93 @@ td.amount {
   .bar-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .entry-form,
+  .guided-form,
+  .settings-form {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-form .form-submit {
+    width: 100%;
+  }
+
+  .span-2,
+  .span-3 {
+    grid-column: auto;
+  }
+
+  .mode-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .primary,
+  .ghost,
+  .danger {
+    min-height: 46px;
+  }
+
+  .table-wrap {
+    border-radius: 14px;
+  }
+
+  table {
+    min-width: 680px;
+  }
+
+  th, td {
+    padding: 10px;
+  }
+
+  .credit-card {
+    min-height: 235px;
+    border-radius: 18px;
+  }
+
+  .card-lines {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .card-lines b {
+    text-align: left;
+    margin-bottom: 6px;
+  }
+
+  .auth-screen {
+    padding: 14px;
+    align-items: stretch;
+  }
+
+  .auth-card {
+    align-self: center;
+  }
+
+  .auth-card h1 {
+    font-size: 28px;
+    margin-left: 22px;
+    margin-right: 22px;
+  }
+
+  .auth-card p,
+  .auth-card .mini-status {
+    margin-left: 22px;
+    margin-right: 22px;
+  }
+
+  .auth-actions {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .login-hero {
+    min-height: 160px;
+    padding: 22px;
   }
 }
