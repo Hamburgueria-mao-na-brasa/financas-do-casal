@@ -42,6 +42,7 @@ let modalMode = null;
 let editingEntryId = null;
 let tutorialStep = 0;
 let inviteCodeVisible = false;
+let entryFilter = "Todos";
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
@@ -77,12 +78,14 @@ function ensureStateShape() {
   state.installments ||= [];
   state.installments = state.installments.map((item) => ({ ...item, paidMonths: item.paidMonths || [] }));
   state.fixedBills ||= [];
+  state.fixedBills = state.fixedBills.map((item) => ({ ...item, paidMonths: item.paidMonths || (item.status === "Pago" ? [state.selectedMonth] : []) }));
   state.goals ||= [];
   state.profile ||= { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 };
   state.profile.salaryOne ||= 0;
   state.profile.salaryTwo ||= 0;
   state.recurring ||= [];
   state.budgets ||= {};
+  state.notificationMarks ||= {};
   if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
   if (typeof state.tutorialDone !== "boolean") state.tutorialDone = false;
   if (typeof state.privacyMode !== "boolean") state.privacyMode = false;
@@ -134,14 +137,18 @@ function cardTotals(cardName) {
   };
 }
 
+function isFixedPaid(item, month = state.selectedMonth) {
+  return (item.paidMonths || []).includes(month);
+}
+
 function currentSummary() {
   const entries = byMonth(state.entries);
   const income = total(entries.filter((item) => item.type === "Receita"));
   const expense = total(entries.filter((item) => item.type === "Despesa"));
   const cardMonth = total(state.cards.map((card) => ({ value: cardTotals(card.name).month })));
   const cardDebt = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
-  const fixedPaid = total((state.fixedBills || []).filter((item) => item.status === "Pago"));
-  const fixedPending = total((state.fixedBills || []).filter((item) => item.status !== "Pago"));
+  const fixedPaid = total((state.fixedBills || []).filter((item) => isFixedPaid(item)));
+  const fixedPending = total((state.fixedBills || []).filter((item) => !isFixedPaid(item)));
   const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
   const goalsSaved = total((state.goals || []).map((goal) => ({ value: goal.saved })));
   return { income, expense, cardMonth, cardDebt, fixedPaid, fixedPending, salaryTotal, goalsSaved, balance: income + salaryTotal - expense - fixedPaid - cardMonth };
@@ -162,6 +169,7 @@ function pageTitle(view) {
 
 function render() {
   ensureStateShape();
+  ensureSmartNotifications();
   saveState(false);
   renderGate();
   if (!currentUser || !cloudReady) return;
@@ -320,7 +328,6 @@ function renderGate(message = "") {
 
 function renderCloudPanel(message = "") {
   const panel = qs("#cloud-panel");
-  const inviteCode = householdInviteCode || "";
 
   if (!cloud) {
     panel.innerHTML = `<span class="mini-status">Modo local</span>`;
@@ -337,10 +344,6 @@ function renderCloudPanel(message = "") {
     <button class="notif-button" id="toggle-privacy" type="button" title="Ocultar valores">${state.privacyMode ? "🙈" : "👁"}</button>
     <span class="mini-status"><i class="dot"></i> Online</span>
     ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
-    ${inviteCode ? `<span class="mini-status invite-code" title="Código do cofre"><b>Código</b><code>${inviteCodeVisible ? inviteCode : "••••••••••"}</code></span>` : ""}
-    ${inviteCode ? `<button class="ghost" id="toggle-invite-code" type="button">${inviteCodeVisible ? "Ocultar código" : "Mostrar código"}</button>` : ""}
-    ${inviteCodeVisible ? `<button class="ghost" id="copy-invite" type="button">Copiar código</button>` : ""}
-    <button class="ghost" id="join-by-code" type="button">Entrar com código</button>
     <button class="ghost" id="logout" type="button">Sair</button>
     ${message ? `<span class="mini-status">${message}</span>` : ""}
   `;
@@ -353,14 +356,6 @@ function renderCloudPanel(message = "") {
     commitState();
   });
   qs("#logout").addEventListener("click", signOut);
-  const toggleInviteCode = qs("#toggle-invite-code");
-  if (toggleInviteCode) toggleInviteCode.addEventListener("click", () => {
-    inviteCodeVisible = !inviteCodeVisible;
-    renderCloudPanel();
-  });
-  const copyInvite = qs("#copy-invite");
-  if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
-  qs("#join-by-code").addEventListener("click", promptJoinHousehold);
   renderNotifications();
 }
 
@@ -383,6 +378,35 @@ function notify(type, text) {
     read: false
   });
   state.notifications = state.notifications.slice(0, 30);
+}
+
+function smartNotify(key, type, text) {
+  const scopedKey = `${state.selectedMonth}:${key}`;
+  if (state.notificationMarks[scopedKey]) return;
+  state.notificationMarks[scopedKey] = true;
+  notify(type, text);
+}
+
+function ensureSmartNotifications() {
+  if (!currentUser || !cloudReady) return;
+  const summary = currentSummary();
+  fixedBillsWithDueInfo().filter((item) => !isFixedPaid(item)).forEach((item) => {
+    if (item.diffDays === 3) smartNotify(`fixed-${item.id}-3`, "sync", `${item.name} vence em 3 dias`);
+    if (item.diffDays === 0) smartNotify(`fixed-${item.id}-0`, "sync", `${item.name} vence hoje`);
+    if (item.diffDays < 0) smartNotify(`fixed-${item.id}-late`, "sync", `${item.name} está atrasada`);
+  });
+  if (summary.balance < 0) smartNotify("negative-balance", "sync", "O saldo do mês ficou negativo");
+  state.cards.forEach((card) => {
+    const totals = cardTotals(card.name);
+    if (Number(card.limit || 0) && totals.used >= Number(card.limit || 0) * 0.8) {
+      smartNotify(`card-limit-${card.id}`, "card", `${card.name} já usou 80% do limite`);
+    }
+  });
+  state.goals.forEach((goal) => {
+    if (Number(goal.target || 0) && Number(goal.saved || 0) >= Number(goal.target || 0)) {
+      smartNotify(`goal-done-${goal.id}`, "goal", `Meta concluída: ${goal.title}`);
+    }
+  });
 }
 
 function renderNotifications() {
@@ -836,11 +860,11 @@ function renderDashboard() {
   const summary = currentSummary();
   const insights = dashboardInsights(summary);
   const fixedAlerts = fixedBillsWithDueInfo()
-    .filter((item) => item.status !== "Pago" && item.priority !== "normal")
+    .filter((item) => !isFixedPaid(item) && item.priority !== "normal")
     .slice(0, 4);
   const pending = [
     ...state.entries.filter((item) => item.status === "Pendente"),
-    ...(state.fixedBills || []).filter((item) => item.status !== "Pago").map(fixedToPendingEntry)
+    ...(state.fixedBills || []).filter((item) => !isFixedPaid(item)).map(fixedToPendingEntry)
   ].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   const budgetAlerts = budgetWarnings();
   const attentionHtml = [
@@ -857,7 +881,7 @@ function renderDashboard() {
   const maxCategory = Math.max(1, ...Object.values(categoryTotals));
   const chartData = monthChartData(summary);
   const upcomingFixed = fixedBillsWithDueInfo()
-    .filter((item) => item.status !== "Pago")
+    .filter((item) => !isFixedPaid(item))
     .slice(0, 5);
   const mood = dashboardMood(summary.balance, summary.salaryTotal);
   const people = appPeople().map((name) => {
@@ -905,7 +929,7 @@ function renderDashboard() {
       <div class="panel">
         <h2>Distribuição</h2>
         <div class="bars">
-          ${chartData.map((item) => bar(item.label, item.value, Math.max(1, ...chartData.map((row) => row.value)), item.color)).join("")}
+          ${chartData.length ? chartData.map((item) => bar(item.label, item.value, Math.max(1, ...chartData.map((row) => row.value)), item.color)).join("") : emptyHtml()}
         </div>
       </div>
     </div>
@@ -983,12 +1007,12 @@ function renderDashboard() {
   `;
 }
 
-function budgetWarnings() {
+function budgetWarnings(includeAll = false) {
   const monthExpenses = byMonth(state.entries).filter((item) => item.type === "Despesa");
   return Object.entries(state.budgets || {}).map(([category, limit]) => {
     const spent = total(monthExpenses.filter((item) => item.category === category));
     return { category, limit, spent, percent: Math.round((spent / Math.max(1, limit)) * 100) };
-  }).filter((item) => item.limit > 0 && item.percent >= 80);
+  }).filter((item) => item.limit > 0 && (includeAll || item.percent >= 80));
 }
 
 function fixedBillsWithDueInfo() {
@@ -1011,7 +1035,7 @@ function fixedBillsWithDueInfo() {
       priority = "soon";
       dueText = `Vence em ${diffDays} dia${diffDays === 1 ? "" : "s"}`;
     }
-    return { ...item, dueDate, diffDays, priority, dueText };
+    return { ...item, status: isFixedPaid(item) ? "Pago" : "Pendente", dueDate, diffDays, priority, dueText };
   }).sort((a, b) => {
     const order = { overdue: 0, today: 1, soon: 2, normal: 3 };
     return order[a.priority] - order[b.priority] || a.dueDate - b.dueDate;
@@ -1033,22 +1057,24 @@ function monthChartData(summary) {
     { label: "Saídas", value: summary.expense, color: "#f04438" },
     { label: "Cartões", value: summary.cardMonth, color: "#147dff" },
     { label: "Contas fixas", value: summary.fixedPaid + summary.fixedPending, color: "#ffb020" }
-  ].filter((item) => item.value > 0);
+  ].map((item) => ({ ...item, value: Number(item.value || 0) }))
+    .filter((item) => Number.isFinite(item.value) && item.value > 0);
 }
 
 function donutChart(items) {
   if (!items.length) return emptyHtml();
   const totalValue = items.reduce((sum, item) => sum + item.value, 0);
+  if (!totalValue) return emptyHtml();
   let cursor = 0;
   const segments = items.map((item) => {
     const start = cursor;
-    const size = Math.max(1, (item.value / totalValue) * 100);
-    cursor += size;
-    return `${item.color} ${start}% ${cursor}%`;
+    const size = (item.value / totalValue) * 100;
+    cursor = Math.min(100, cursor + size);
+    return `${item.color} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
   }).join(", ");
   return `
     <div class="chart-card">
-      <div class="donut" style="--segments:${segments}">
+      <div class="donut" style="background: conic-gradient(${segments});">
         <div><strong>${formatMoney(totalValue)}</strong><span>Total movimentado</span></div>
       </div>
       <div class="chart-legend">
@@ -1212,7 +1238,12 @@ function renderEntries() {
   if (editing) entryMode = editing.type;
   if (entryMode === "Cartão") entryMode = "Despesa";
   const isIncome = entryMode === "Receita";
+  const filteredEntries = filterEntries(state.entries);
   qs("#entries").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Lançamentos</h2>
+      <p>Use esta tela para entradas e saídas feitas na hora. Cartão e contas fixas ficam separados para não misturar.</p>
+    </div>
     <form class="entry-form guided-form" id="entry-form">
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
         <button class="${entryMode === "Receita" ? "active" : ""}" type="button" data-entry-mode="Receita">Entrada</button>
@@ -1237,7 +1268,13 @@ function renderEntries() {
       </div>
       <button class="ghost" id="generate-recurring" type="button">Gerar fixos deste mês</button>
     </div>
-    ${table(["Data", "Tipo", "Categoria", "Descrição", "Valor", "Quem", "Situação", ""], state.entries.map((item) => [
+    <div class="panel">
+      <h2>Filtros</h2>
+      <div class="mode-picker filter-tabs">
+        ${["Todos", "Entrada", "Saída", "Pago", "Pendente"].map((filter) => `<button class="${entryFilter === filter ? "active" : ""}" type="button" data-entry-filter="${filter}">${filter}</button>`).join("")}
+      </div>
+    </div>
+    ${table(["Data", "Tipo", "Categoria", "Descrição", "Valor", "Quem", "Situação", ""], filteredEntries.map((item) => [
       dateFmt.format(new Date(`${item.date}T00:00:00Z`)),
       pill(item.type === "Receita" ? "Entrada" : "Saída", item.type.toLowerCase()),
       item.category,
@@ -1260,6 +1297,22 @@ function renderEntries() {
       entryMode = button.dataset.entryMode;
       renderEntries();
     });
+  });
+  document.querySelectorAll("[data-entry-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      entryFilter = button.dataset.entryFilter;
+      renderEntries();
+    });
+  });
+}
+
+function filterEntries(entries) {
+  return entries.filter((item) => {
+    if (entryFilter === "Entrada") return item.type === "Receita";
+    if (entryFilter === "Saída") return item.type === "Despesa";
+    if (entryFilter === "Pago") return item.status === "Pago";
+    if (entryFilter === "Pendente") return item.status === "Pendente";
+    return true;
   });
 }
 
@@ -1349,19 +1402,22 @@ function renderFixedBills() {
 }
 
 function fixedBillCard(item) {
+  const paid = isFixedPaid(item);
+  const info = fixedBillsWithDueInfo().find((bill) => bill.id === item.id) || item;
   return `
-    <article class="wallet-account fixed-bill ${item.status === "Pago" ? "paid" : "pending"}">
+    <article class="wallet-account fixed-bill ${paid ? "paid" : "pending"}">
       <div>
         <span>${item.category}</span>
         <strong>${item.name}</strong>
-        <small>Vence dia ${item.dueDay} · ${item.person}</small>
+        <small>${info.dueText || `Vence dia ${item.dueDay}`} · ${item.person} · ${state.selectedMonth}</small>
       </div>
       <div class="wallet-account-money">
-        <span>${item.status}</span>
+        <span>${paid ? "Pago no mês" : "Pendente no mês"}</span>
         <strong>${formatMoney(item.value)}</strong>
       </div>
       <div class="wallet-account-flow">
-        <button class="tiny ghost" data-toggle-fixed="${item.id}">${item.status === "Pago" ? "Marcar pendente" : "Marcar pago"}</button>
+        <button class="tiny ghost" data-toggle-fixed="${item.id}">${paid ? "Marcar pendente" : "Marcar pago"}</button>
+        <button class="tiny ghost" data-edit-fixed="${item.id}">Editar</button>
         <button class="tiny danger" data-delete-fixed="${item.id}">Excluir</button>
       </div>
     </article>
@@ -1378,9 +1434,26 @@ function addFixedBill(event) {
     dueDay: Number(data.dueDay || 1),
     category: data.category,
     person: data.person,
-    status: data.status
+    status: data.status,
+    paidMonths: data.status === "Pago" ? [state.selectedMonth] : []
   });
   notify("sync", `Conta fixa adicionada: ${data.name}`);
+  commitState();
+}
+
+function editFixedBill(id) {
+  const item = state.fixedBills.find((bill) => bill.id === id);
+  if (!item) return;
+  const name = prompt("Nome da conta fixa:", item.name);
+  if (name === null) return;
+  const value = prompt("Valor mensal:", item.value);
+  if (value === null) return;
+  const dueDay = prompt("Dia do vencimento:", item.dueDay);
+  if (dueDay === null) return;
+  item.name = name || item.name;
+  item.value = Number(value || 0);
+  item.dueDay = Number(dueDay || 1);
+  notify("sync", `Conta fixa editada: ${item.name}`);
   commitState();
 }
 
@@ -1424,16 +1497,29 @@ function renderCards() {
 
 function cardInvoiceRow(card) {
   const totals = cardTotals(card.name);
+  const monthItems = cardMonthItems(card.name);
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   return `
-    <div class="list-item">
-      <div>
-        <strong>${card.name}</strong>
-        <span>Atual ${formatMoney(totals.month)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+    <div class="invoice-card">
+      <div class="list-item">
+        <div>
+          <strong>${card.name}</strong>
+          <span>Atual ${formatMoney(totals.month)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+        </div>
+        <button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>
       </div>
-      <button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>
+      <div class="invoice-items">
+        ${monthItems.length ? monthItems.map((item) => `<span>${item.description} · ${item.partLabel}<b>${formatMoney(item.value)}</b></span>`).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
+      </div>
     </div>
   `;
+}
+
+function cardMonthItems(cardName) {
+  return state.installments
+    .filter((item) => item.card === cardName)
+    .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, description: item.description, partLabel: `${index + 1}/${item.parts}` })))
+    .filter((part) => part.month === state.selectedMonth && !part.paid);
 }
 
 function cardSummary(card) {
@@ -1452,7 +1538,10 @@ function cardSummary(card) {
       <span>Fatura do mês</span><b>${formatMoney(totals.month)}</b>
     </div>
     <div class="track card-track"><div class="fill" style="--w:${percent}%;--c:rgba(255,255,255,.88)"></div></div>
-    <button class="tiny danger" data-delete-card="${card.id}">Excluir cartão</button>
+    <div class="card-actions">
+      <button class="tiny ghost" data-edit-card="${card.id}">Editar</button>
+      <button class="tiny danger" data-delete-card="${card.id}">Excluir cartão</button>
+    </div>
   </article>`;
 }
 
@@ -1563,7 +1652,10 @@ function accountCard(account) {
         <span>Entradas ${formatMoney(income)}</span>
         <span>Saídas ${formatMoney(expense)}</span>
       </div>
-      <button class="tiny danger" data-delete-account="${account.id}">Excluir</button>
+      <div class="card-actions">
+        <button class="tiny ghost" data-edit-account="${account.id}">Editar</button>
+        <button class="tiny danger" data-delete-account="${account.id}">Excluir</button>
+      </div>
     </article>
   `;
 }
@@ -1573,6 +1665,21 @@ function addAccount(event) {
   const data = Object.fromEntries(new FormData(event.target));
   state.accounts.push({ id: crypto.randomUUID(), name: data.name, type: data.type, owner: data.owner, initial: Number(data.initial || 0) });
   notify("account", `Carteira adicionada: ${data.name}`);
+  commitState();
+}
+
+function editAccount(id) {
+  const item = state.accounts.find((account) => account.id === id);
+  if (!item) return;
+  const oldName = item.name;
+  const name = prompt("Nome da carteira:", item.name);
+  if (name === null) return;
+  const initial = prompt("Saldo inicial:", item.initial);
+  if (initial === null) return;
+  item.name = name || item.name;
+  state.entries = state.entries.map((entry) => entry.account === oldName ? { ...entry, account: item.name } : entry);
+  item.initial = Number(initial || 0);
+  notify("account", `Carteira editada: ${item.name}`);
   commitState();
 }
 
@@ -1687,6 +1794,7 @@ function addGoal(event) {
 }
 
 function renderSettings() {
+  const inviteCode = householdInviteCode || "";
   qs("#settings").innerHTML = `
     <form class="settings-form" id="profile-form">
       <div class="span-3"><h2>Perfil do casal</h2></div>
@@ -1730,10 +1838,30 @@ function renderSettings() {
         <button class="primary form-submit" type="submit">Salvar limite</button>
       </form>
       <div class="panel">
+        <h2>Orçamentos salvos</h2>
+        <div class="bars">
+          ${budgetRowsHtml()}
+        </div>
+      </div>
+      <div class="panel">
         <h2>Backup</h2>
         <div class="list">
           <button class="ghost" id="export-data" type="button">Exportar dados</button>
           <label class="field"><span>Importar backup</span><input id="import-data" type="file" accept="application/json"></label>
+        </div>
+      </div>
+      <div class="panel danger-zone">
+        <h2>Configurações da conta</h2>
+        <div class="list">
+          ${inviteCode ? `
+            <div class="list-item invite-config">
+              <div><strong>Código do cofre</strong><span>${inviteCodeVisible ? inviteCode : "••••••••••"}</span></div>
+              <button class="tiny ghost" id="toggle-invite-code" type="button">${inviteCodeVisible ? "Ocultar" : "Mostrar"}</button>
+            </div>
+            ${inviteCodeVisible ? `<button class="ghost" id="copy-invite" type="button">Copiar código</button>` : ""}
+          ` : ""}
+          <button class="ghost" id="join-by-code" type="button">Entrar com código de outro cofre</button>
+          <button class="danger" id="reset-data" type="button">Reiniciar controle do zero</button>
         </div>
       </div>
     </div>
@@ -1744,6 +1872,20 @@ function renderSettings() {
   qs("#budget-form").addEventListener("submit", saveBudget);
   qs("#export-data").addEventListener("click", exportData);
   qs("#import-data").addEventListener("change", importData);
+  const toggleInviteCode = qs("#toggle-invite-code");
+  if (toggleInviteCode) toggleInviteCode.addEventListener("click", () => {
+    inviteCodeVisible = !inviteCodeVisible;
+    renderSettings();
+  });
+  const copyInvite = qs("#copy-invite");
+  if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
+  qs("#join-by-code").addEventListener("click", promptJoinHousehold);
+  qs("#reset-data").addEventListener("click", resetData);
+}
+
+function budgetRowsHtml() {
+  const rows = budgetWarnings(true);
+  return rows.length ? rows.map((item) => bar(`${item.category} · ${item.percent}%`, item.spent, Math.max(item.limit, item.spent, 1), item.percent >= 100 ? "#f04438" : item.percent >= 80 ? "#ffb020" : "#00bf7a")).join("") : emptyHtml();
 }
 
 function addRecurring(event) {
@@ -1798,6 +1940,14 @@ function importData(event) {
   reader.readAsText(file);
 }
 
+function resetData() {
+  if (!confirm("Tem certeza que deseja reiniciar o controle do zero?")) return;
+  state = blankState();
+  notify("sync", "Controle reiniciado do zero");
+  localStorage.removeItem("coupleFinanceApp");
+  commitState();
+}
+
 function saveProfile(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
@@ -1825,6 +1975,21 @@ function addCard(event) {
   const data = Object.fromEntries(new FormData(event.target));
   state.cards.push({ id: crypto.randomUUID(), name: data.name, limit: Number(data.limit || 0), color: data.color || "Verde" });
   notify("card", `Cartão cadastrado: ${data.name} · limite ${formatMoney(Number(data.limit || 0))}`);
+  commitState();
+}
+
+function editCard(id) {
+  const item = state.cards.find((card) => card.id === id);
+  if (!item) return;
+  const oldName = item.name;
+  const name = prompt("Nome do cartão:", item.name);
+  if (name === null) return;
+  const limit = prompt("Limite total:", item.limit);
+  if (limit === null) return;
+  item.name = name || item.name;
+  state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
+  item.limit = Number(limit || 0);
+  notify("card", `Cartão editado: ${item.name}`);
   commitState();
 }
 
@@ -1915,11 +2080,18 @@ document.addEventListener("click", (event) => {
   if (event.target.dataset.toggleFixed) {
     state.fixedBills = (state.fixedBills || []).map((item) => {
       if (item.id !== event.target.dataset.toggleFixed) return item;
-      return { ...item, status: item.status === "Pago" ? "Pendente" : "Pago" };
+      const paidMonths = new Set(item.paidMonths || []);
+      if (paidMonths.has(state.selectedMonth)) paidMonths.delete(state.selectedMonth);
+      else paidMonths.add(state.selectedMonth);
+      return { ...item, paidMonths: [...paidMonths], status: paidMonths.has(state.selectedMonth) ? "Pago" : "Pendente" };
     });
     notify("sync", "Status da conta fixa atualizado");
     commitState();
   }
+
+  if (event.target.dataset.editFixed) editFixedBill(event.target.dataset.editFixed);
+  if (event.target.dataset.editCard) editCard(event.target.dataset.editCard);
+  if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
 
   if (event.target.dataset.addGoal) {
     const goal = state.goals.find((item) => item.id === event.target.dataset.addGoal);
@@ -1977,13 +2149,6 @@ document.addEventListener("click", (event) => {
 qs("#month-filter").addEventListener("change", (event) => {
   state.selectedMonth = event.target.value;
   render();
-});
-
-qs("#reset-data").addEventListener("click", () => {
-  state = blankState();
-  notify("sync", "Controle reiniciado do zero");
-  localStorage.removeItem("coupleFinanceApp");
-  commitState();
 });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
