@@ -41,6 +41,7 @@ let walletTab = "money";
 let modalMode = null;
 let editingEntryId = null;
 let tutorialStep = 0;
+let inviteCodeVisible = false;
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
@@ -336,8 +337,9 @@ function renderCloudPanel(message = "") {
     <button class="notif-button" id="toggle-privacy" type="button" title="Ocultar valores">${state.privacyMode ? "🙈" : "👁"}</button>
     <span class="mini-status"><i class="dot"></i> Online</span>
     ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
-    ${inviteCode ? `<span class="mini-status invite-code" title="Código do cofre"><b>Código</b><code>${inviteCode}</code></span>` : ""}
-    <button class="ghost" id="copy-invite" type="button">Copiar código</button>
+    ${inviteCode ? `<span class="mini-status invite-code" title="Código do cofre"><b>Código</b><code>${inviteCodeVisible ? inviteCode : "••••••••••"}</code></span>` : ""}
+    ${inviteCode ? `<button class="ghost" id="toggle-invite-code" type="button">${inviteCodeVisible ? "Ocultar código" : "Mostrar código"}</button>` : ""}
+    ${inviteCodeVisible ? `<button class="ghost" id="copy-invite" type="button">Copiar código</button>` : ""}
     <button class="ghost" id="join-by-code" type="button">Entrar com código</button>
     <button class="ghost" id="logout" type="button">Sair</button>
     ${message ? `<span class="mini-status">${message}</span>` : ""}
@@ -351,7 +353,13 @@ function renderCloudPanel(message = "") {
     commitState();
   });
   qs("#logout").addEventListener("click", signOut);
-  qs("#copy-invite").addEventListener("click", copyInviteLink);
+  const toggleInviteCode = qs("#toggle-invite-code");
+  if (toggleInviteCode) toggleInviteCode.addEventListener("click", () => {
+    inviteCodeVisible = !inviteCodeVisible;
+    renderCloudPanel();
+  });
+  const copyInvite = qs("#copy-invite");
+  if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
   qs("#join-by-code").addEventListener("click", promptJoinHousehold);
   renderNotifications();
 }
@@ -827,12 +835,16 @@ function renderMonthFilter() {
 function renderDashboard() {
   const summary = currentSummary();
   const insights = dashboardInsights(summary);
+  const fixedAlerts = fixedBillsWithDueInfo()
+    .filter((item) => item.status !== "Pago" && item.priority !== "normal")
+    .slice(0, 4);
   const pending = [
     ...state.entries.filter((item) => item.status === "Pendente"),
     ...(state.fixedBills || []).filter((item) => item.status !== "Pago").map(fixedToPendingEntry)
   ].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   const budgetAlerts = budgetWarnings();
   const attentionHtml = [
+    ...fixedAlerts.map(fixedAlertItem),
     ...budgetAlerts.map((item) => `<div class="list-item"><div><strong>${item.category}</strong><span>${item.percent}% do orçamento usado</span></div><b>${formatMoney(item.spent)} / ${formatMoney(item.limit)}</b></div>`),
     ...pending.map((item) => `<div class="list-item"><div><strong>${item.description || item.category}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`)
   ].join("");
@@ -843,9 +855,8 @@ function renderDashboard() {
     .filter((item) => item.type === "Despesa")
     .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
   const maxCategory = Math.max(1, ...Object.values(categoryTotals));
-  const upcomingFixed = [...(state.fixedBills || [])]
+  const upcomingFixed = fixedBillsWithDueInfo()
     .filter((item) => item.status !== "Pago")
-    .sort((a, b) => Number(a.dueDay || 31) - Number(b.dueDay || 31))
     .slice(0, 5);
   const mood = dashboardMood(summary.balance, summary.salaryTotal);
   const people = appPeople().map((name) => {
@@ -923,8 +934,8 @@ function renderDashboard() {
         <h2>Próximas contas fixas</h2>
         <div class="list">
           ${upcomingFixed.length ? upcomingFixed.map((item) => `
-            <div class="list-item">
-              <div><strong>${item.name}</strong><span>Vence dia ${item.dueDay} · ${item.person}</span></div>
+            <div class="list-item due-item ${item.priority}">
+              <div><strong>${item.name}</strong><span>${item.dueText} · ${item.person} · ${item.category}</span></div>
               <b>${formatMoney(item.value)}</b>
             </div>
           `).join("") : emptyHtml()}
@@ -1774,6 +1785,15 @@ function emptyHtml() {
 }
 
 document.addEventListener("click", (event) => {
+  if (
+    notificationsOpen &&
+    !event.target.closest("#notifications-panel") &&
+    !event.target.closest("#toggle-notifications")
+  ) {
+    notificationsOpen = false;
+    renderNotifications();
+  }
+
   const tab = event.target.closest("[data-view]");
   if (tab) {
     document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
