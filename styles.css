@@ -900,6 +900,7 @@ h2 {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .wallet-account-flow span {
@@ -914,6 +915,7 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+  align-items: center;
 }
 
 .hidden {
@@ -1326,6 +1328,10 @@ h2 {
   border-radius: 8px;
   padding: 0 14px;
   font-weight: 700;
+  line-height: 1.1;
+  display: inline-grid;
+  place-items: center;
+  text-align: center;
   transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
 }
 
@@ -1760,14 +1766,14 @@ td.amount {
   }
 
   .tab {
-    flex: 0 0 76px;
-    min-height: 68px;
+    flex: 0 0 70px;
+    min-height: 60px;
     padding: 8px 6px;
-    border-radius: 22px;
+    border-radius: 18px;
     display: grid;
     place-items: center;
     gap: 2px;
-    font-size: 20px;
+    font-size: 18px;
     color: #b9d7d1;
     background: transparent;
   }
@@ -1782,7 +1788,7 @@ td.amount {
   }
 
   .tab[data-view="entries"] {
-    flex-basis: 94px;
+    flex-basis: 82px;
   }
 
   .tab[data-view="entries"].active {
@@ -1794,7 +1800,7 @@ td.amount {
   .tab span {
     display: block;
     max-width: 100%;
-    font-size: 10px;
+    font-size: 9.5px;
     line-height: 1.1;
     text-align: center;
     white-space: normal;
@@ -1866,16 +1872,17 @@ td.amount {
 
   .cloud-panel {
     display: grid;
-    grid-template-columns: 1fr 56px 56px;
+    grid-template-columns: 1fr 48px 48px;
     width: 100%;
     justify-content: stretch;
+    gap: 8px;
   }
 
   .top-status,
   .notif-button {
-    min-height: 54px;
+    min-height: 48px;
     width: 100%;
-    border-radius: 18px;
+    border-radius: 16px;
     color: #f2fff9;
     background: rgba(255, 255, 255, .08);
     border-color: rgba(183, 255, 238, .15);
@@ -1884,7 +1891,21 @@ td.amount {
 
   .top-status {
     min-width: 0;
-    padding: 8px 14px;
+    padding: 7px 12px;
+  }
+
+  .top-status span {
+    font-size: 12px;
+  }
+
+  .top-status small {
+    font-size: 11px;
+  }
+
+  .notif-button {
+    height: 48px;
+    padding: 0;
+    font-size: 18px;
   }
 
   .top-status span {
@@ -1932,8 +1953,10 @@ td.amount {
 
   .fab {
     right: 18px;
-    bottom: 116px;
-    border-radius: 22px;
+    bottom: 104px;
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
     background: linear-gradient(135deg, #00bf7a, #17a8ff);
   }
 
@@ -1983,9 +2006,9 @@ td.amount {
   }
 
   .action-chip {
-    min-height: 92px;
+    min-height: 76px;
     padding: 12px 10px;
-    border-radius: 24px;
+    border-radius: 20px;
     color: #f2fff9;
     background: rgba(255, 255, 255, .07);
     border-color: rgba(183, 255, 238, .13);
@@ -2009,8 +2032,14 @@ td.amount {
   }
 
   .action-chip b {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    font-size: 19px;
+  }
+
+  .action-chip span {
+    font-size: 14px;
   }
 
   .statement-item {
@@ -2093,17 +2122,17 @@ td.amount {
   .mode-picker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    padding: 10px;
-    border-radius: 30px;
+    padding: 6px;
+    border-radius: 22px;
     background: rgba(255, 255, 255, .08);
     border-color: rgba(183, 255, 238, .10);
   }
 
   .mode-picker button {
-    min-height: 66px;
-    border-radius: 24px;
+    min-height: 50px;
+    border-radius: 17px;
     color: #b5d1cb;
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .mode-picker button.active {
@@ -2125,13 +2154,13 @@ td.amount {
   .field select,
   .field textarea,
   .password-wrap {
-    min-height: 70px;
-    padding: 0 20px;
-    border-radius: 28px;
+    min-height: 58px;
+    padding: 0 16px;
+    border-radius: 20px;
     color: #f2fff9;
     background: rgba(255, 255, 255, .055);
     border-color: rgba(183, 255, 238, .14);
-    font-size: 20px;
+    font-size: 17px;
   }
 
   .password-wrap {
@@ -2147,7 +2176,7 @@ td.amount {
   }
 
   .show-password {
-    min-height: 70px;
+    min-height: 58px;
     color: #071b1b;
     background: linear-gradient(135deg, #00bf7a, #17a8ff);
     border-left: 0;
@@ -2156,10 +2185,10 @@ td.amount {
   .primary,
   .ghost,
   .danger {
-    min-height: 66px;
+    min-height: 54px;
     width: 100%;
-    border-radius: 24px;
-    font-size: 18px;
+    border-radius: 18px;
+    font-size: 16px;
   }
 
   .primary {
@@ -2175,12 +2204,17 @@ td.amount {
   }
 
   .tiny {
+    min-height: 34px;
     width: auto;
+    padding: 0 10px;
+    border-radius: 12px;
+    font-size: 12px;
   }
 
   .card-actions .tiny,
   .wallet-account-flow .tiny {
-    width: 100%;
+    width: auto;
+    min-width: 108px;
   }
 
   .metric {
