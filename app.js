@@ -12,6 +12,7 @@ const seed = {
   cards: [],
   entries: [],
   installments: [],
+  cardRecurring: [],
   fixedBills: [],
   methodIncome: 0,
   goals: [],
@@ -80,6 +81,8 @@ function ensureStateShape() {
   state.entries ||= [];
   state.installments ||= [];
   state.installments = state.installments.map((item) => ({ ...item, paidMonths: item.paidMonths || [] }));
+  state.cardRecurring ||= [];
+  state.cardRecurring = state.cardRecurring.map((item) => ({ ...item, paidMonths: item.paidMonths || [], active: item.active !== false }));
   state.fixedBills ||= [];
   state.fixedBills = state.fixedBills.map((item) => ({ ...item, paidMonths: item.paidMonths || (item.status === "Pago" ? [state.selectedMonth] : []) }));
   state.goals ||= [];
@@ -128,15 +131,26 @@ function getInstallmentSchedule(item) {
 }
 
 function cardTotals(cardName) {
+  const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   const scheduled = state.installments
     .filter((item) => item.card === cardName)
     .flatMap(getInstallmentSchedule);
+  const recurring = state.cardRecurring
+    .filter((item) => item.card === cardName && item.active !== false)
+    .map((item) => ({ month: state.selectedMonth, value: Number(item.value || 0), paid: (item.paidMonths || []).includes(state.selectedMonth) }));
+  const recurringNext = state.cardRecurring
+    .filter((item) => item.card === cardName && item.active !== false && !(item.paidMonths || []).includes(nextMonth))
+    .map((item) => ({ value: Number(item.value || 0) }));
   const open = scheduled.filter((part) => !part.paid);
-  const monthOpen = open.filter((part) => part.month === state.selectedMonth);
+  const recurringOpen = recurring.filter((part) => !part.paid);
+  const monthOpen = [
+    ...open.filter((part) => part.month === state.selectedMonth),
+    ...recurringOpen
+  ];
   return {
-    used: total(open),
+    used: total(open) + total(recurringOpen),
     month: total(monthOpen),
-    next: total(open.filter((part) => part.month === months[(monthIndex(state.selectedMonth) + 1) % 12]))
+    next: total(open.filter((part) => part.month === nextMonth)) + total(recurringNext)
   };
 }
 
@@ -378,12 +392,13 @@ function currentActor() {
   return currentUser?.email?.split("@")[0] || "Alguém";
 }
 
-function notify(type, text) {
+function notify(type, text, view = "") {
   ensureStateShape();
   state.notifications.unshift({
     id: crypto.randomUUID(),
     type,
     text,
+    view: view || notificationTarget(type, text),
     actor: currentActor(),
     at: new Date().toISOString(),
     read: false
@@ -391,31 +406,44 @@ function notify(type, text) {
   state.notifications = state.notifications.slice(0, 30);
 }
 
-function smartNotify(key, type, text) {
+function smartNotify(key, type, text, view = "") {
   const scopedKey = `${state.selectedMonth}:${key}`;
   if (state.notificationMarks[scopedKey]) return;
   state.notificationMarks[scopedKey] = true;
-  notify(type, text);
+  notify(type, text, view);
+}
+
+function notificationTarget(type, text = "") {
+  const lower = text.toLowerCase();
+  if (type === "entry") return "statement";
+  if (type === "card") return "cards";
+  if (type === "account") return "accounts";
+  if (type === "goal") return "goals";
+  if (type === "invite") return "settings";
+  if (lower.includes("vence") || lower.includes("atrasad")) return "agenda";
+  if (lower.includes("fixo") || lower.includes("conta fixa")) return "fixed";
+  if (lower.includes("orçamento") || lower.includes("perfil") || lower.includes("categoria") || lower.includes("backup")) return "settings";
+  return "dashboard";
 }
 
 function ensureSmartNotifications() {
   if (!currentUser || !cloudReady) return;
   const summary = currentSummary();
   fixedBillsWithDueInfo().filter((item) => !isFixedPaid(item)).forEach((item) => {
-    if (item.diffDays === 3) smartNotify(`fixed-${item.id}-3`, "sync", `${item.name} vence em 3 dias`);
-    if (item.diffDays === 0) smartNotify(`fixed-${item.id}-0`, "sync", `${item.name} vence hoje`);
-    if (item.diffDays < 0) smartNotify(`fixed-${item.id}-late`, "sync", `${item.name} está atrasada`);
+    if (item.diffDays === 3) smartNotify(`fixed-${item.id}-3`, "sync", `${item.name} vence em 3 dias`, "agenda");
+    if (item.diffDays === 0) smartNotify(`fixed-${item.id}-0`, "sync", `${item.name} vence hoje`, "agenda");
+    if (item.diffDays < 0) smartNotify(`fixed-${item.id}-late`, "sync", `${item.name} está atrasada`, "agenda");
   });
-  if (summary.balance < 0) smartNotify("negative-balance", "sync", "O saldo do mês ficou negativo");
+  if (summary.balance < 0) smartNotify("negative-balance", "sync", "O saldo do mês ficou negativo", "dashboard");
   state.cards.forEach((card) => {
     const totals = cardTotals(card.name);
     if (Number(card.limit || 0) && totals.used >= Number(card.limit || 0) * 0.8) {
-      smartNotify(`card-limit-${card.id}`, "card", `${card.name} já usou 80% do limite`);
+      smartNotify(`card-limit-${card.id}`, "card", `${card.name} já usou 80% do limite`, "cards");
     }
   });
   state.goals.forEach((goal) => {
     if (Number(goal.target || 0) && Number(goal.saved || 0) >= Number(goal.target || 0)) {
-      smartNotify(`goal-done-${goal.id}`, "goal", `Meta concluída: ${goal.title}`);
+      smartNotify(`goal-done-${goal.id}`, "goal", `Meta concluída: ${goal.title}`, "goals");
     }
   });
 }
@@ -562,7 +590,7 @@ function renderModal() {
 }
 
 function editModalHtml(config) {
-  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
+  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", cardRecurring: "Editar fixo no cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
   const fields = config.fields.map((field) => input(field.name, field.label, field.type || "text", field.value ?? "", field.step || "")).join("");
   return `
     <div class="modal-card">
@@ -604,6 +632,7 @@ function saveEditModal(event) {
       item.name = data.name;
       item.limit = Number(data.limit || 0);
       state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
+      state.cardRecurring = state.cardRecurring.map((fixed) => fixed.card === oldName ? { ...fixed, card: item.name } : fixed);
     }
   }
   if (data.kind === "installment") {
@@ -617,6 +646,18 @@ function saveEditModal(event) {
         value: Number(data.value || 0),
         parts: Math.max(1, Number(data.parts || 1)),
         firstMonth: data.firstMonth
+      });
+    }
+  }
+  if (data.kind === "cardRecurring") {
+    const item = state.cardRecurring.find((fixed) => fixed.id === data.id);
+    if (item) {
+      Object.assign(item, {
+        card: data.card,
+        description: data.description,
+        category: data.category,
+        value: Number(data.value || 0),
+        day: Number(data.day || 1)
       });
     }
   }
@@ -674,11 +715,12 @@ function saveQuickEntry(event) {
 
 function notificationItem(item) {
   const time = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(item.at));
+  const view = item.view || notificationTarget(item.type, item.text);
   return `
-    <article class="notification-item ${item.read ? "" : "unread"}">
+    <button class="notification-item ${item.read ? "" : "unread"}" type="button" data-notification-id="${item.id}" data-notification-view="${view}">
       <span>${notificationIcon(item.type)}</span>
-      <div><strong>${item.text}</strong><small>${item.actor} · ${time}</small></div>
-    </article>
+      <div><strong>${item.text}</strong><small>${item.actor} · ${time} · abrir ${pageTitle(view) || "tela"}</small></div>
+    </button>
   `;
 }
 
@@ -1570,6 +1612,16 @@ function renderStatement() {
         tone: "card",
         action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
       }))),
+    ...state.cardRecurring.filter((item) => item.active !== false).map((item) => ({
+      id: item.id,
+      kind: "Cartão",
+      date: recurringCardDateForMonth(item),
+      title: item.description,
+      detail: `${item.card} · cobrança fixa · ${(item.paidMonths || []).includes(state.selectedMonth) ? "Pago" : "Aberto"}`,
+      value: Number(item.value || 0),
+      tone: "card",
+      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${(item.paidMonths || []).includes(state.selectedMonth) ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
+    })),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
       kind: "Conta fixa",
@@ -1621,6 +1673,11 @@ function renderStatement() {
 function fixedDateForMonth(item) {
   const year = new Date().getFullYear();
   return new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+}
+
+function recurringCardDateForMonth(item) {
+  const year = new Date().getFullYear();
+  return new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
 }
 
 function statementRow(item) {
@@ -1777,6 +1834,15 @@ function renderCards() {
       ${select("firstMonth", "Primeiro mês", months, "", "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Adicionar</button>
     </form>
+    <form class="entry-form" id="card-recurring-form">
+      <div class="span-3"><h2>Adicionar fixo no cartão</h2></div>
+      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
+      ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
+      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
+      ${input("value", "Valor mensal", "number", "", "0.01", "Valor cobrado todo mês.")}
+      ${input("day", "Dia da cobrança", "number", "10", "1", "Dia aproximado em que aparece na fatura.")}
+      <button class="primary" type="submit">Salvar fixo</button>
+    </form>
     <div class="grid-3">
       ${state.cards.map(cardSummary).join("") || emptyHtml()}
     </div>
@@ -1784,6 +1850,12 @@ function renderCards() {
       <h2>Faturas por cartão</h2>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Fixos no cartão</h2>
+      <div class="list">
+        ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
@@ -1798,6 +1870,22 @@ function renderCards() {
     </div>
   `;
   qs("#card-form").addEventListener("submit", addInstallment);
+  qs("#card-recurring-form").addEventListener("submit", addCardRecurring);
+}
+
+function cardRecurringRow(item) {
+  const paid = (item.paidMonths || []).includes(state.selectedMonth);
+  return `
+    <div class="list-item">
+      <div><strong>${item.description}</strong><span>${item.card} · dia ${item.day} · ${item.category} · ${paid ? "Pago neste mês" : "Aberto neste mês"}</span></div>
+      <b>${formatMoney(item.value)}</b>
+      <span class="card-actions">
+        <button class="tiny ghost" data-toggle-card-recurring="${item.id}">${paid ? "Reabrir" : "Marcar pago"}</button>
+        <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button>
+        <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>
+      </span>
+    </div>
+  `;
 }
 
 function cardInvoiceRow(card) {
@@ -1829,10 +1917,22 @@ function cardInvoiceRow(card) {
 }
 
 function cardMonthItems(cardName) {
-  return state.installments
+  const installments = state.installments
     .filter((item) => item.card === cardName)
     .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
     .filter((part) => part.month === state.selectedMonth);
+  const recurring = state.cardRecurring
+    .filter((item) => item.card === cardName && item.active !== false)
+    .map((item) => ({
+      month: state.selectedMonth,
+      value: Number(item.value || 0),
+      paid: (item.paidMonths || []).includes(state.selectedMonth),
+      installmentId: item.id,
+      description: item.description,
+      category: item.category,
+      partLabel: "fixo mensal"
+    }));
+  return [...installments, ...recurring];
 }
 
 function cardSummary(card) {
@@ -1878,6 +1978,24 @@ function addInstallment(event) {
     paidMonths: []
   });
   notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
+  commitState();
+}
+
+function addCardRecurring(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  if (!state.cards.length) return;
+  state.cardRecurring.unshift({
+    id: crypto.randomUUID(),
+    card: data.card,
+    description: data.description,
+    category: data.category,
+    value: Number(data.value || 0),
+    day: Number(data.day || 1),
+    paidMonths: [],
+    active: true
+  });
+  notify("card", `Fixo no cartão: ${data.description} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
 
@@ -2366,6 +2484,19 @@ function editInstallment(id) {
   renderModal();
 }
 
+function editCardRecurring(id) {
+  const item = state.cardRecurring.find((fixed) => fixed.id === id);
+  if (!item) return;
+  modalMode = { kind: "cardRecurring", id, fields: [
+    { name: "card", label: "Cartão", value: item.card },
+    { name: "description", label: "Nome", value: item.description },
+    { name: "category", label: "Categoria", value: item.category },
+    { name: "value", label: "Valor mensal", type: "number", step: "0.01", value: item.value },
+    { name: "day", label: "Dia da cobrança", type: "number", step: "1", value: item.day }
+  ] };
+  renderModal();
+}
+
 function labelWithHelp(label, help = "") {
   return `${label}${help ? `<button class="help-dot" type="button" title="${help}" aria-label="${help}">?</button>` : ""}`;
 }
@@ -2408,8 +2539,13 @@ function emptyHtml() {
   return qs("#empty-state").innerHTML;
 }
 
+function navViewFor(view) {
+  return ["cards", "accounts", "method", "goals", "settings"].includes(view) ? "more" : view;
+}
+
 function setActiveView(view) {
-  document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  const navView = navViewFor(view);
+  document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === navView));
   document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === view));
   qs("#page-title").textContent = pageTitle(view);
   document.body.dataset.view = view;
@@ -2430,9 +2566,22 @@ document.addEventListener("click", (event) => {
     setActiveView(tab.dataset.view);
   }
 
+  const notificationButton = event.target.closest("[data-notification-id]");
+  if (notificationButton) {
+    const id = notificationButton.dataset.notificationId;
+    const item = (state.notifications || []).find((notification) => notification.id === id);
+    const view = notificationButton.dataset.notificationView || item?.view || notificationTarget(item?.type, item?.text);
+    state.notifications = (state.notifications || []).map((notification) => notification.id === id ? { ...notification, read: true, view } : notification);
+    notificationsOpen = false;
+    setActiveView(view);
+    commitState();
+    return;
+  }
+
   const deleteMap = [
     ["deleteEntry", "entries", "entry"],
     ["deleteInstallment", "installments", "installment"],
+    ["deleteCardRecurring", "cardRecurring", "cardRecurring"],
     ["deleteAccount", "accounts", "account"],
     ["deleteCard", "cards", "card"],
     ["deleteFixed", "fixedBills", "fixed"],
@@ -2441,7 +2590,21 @@ document.addEventListener("click", (event) => {
   for (const [datasetKey, stateKey] of deleteMap) {
     if (event.target.dataset[datasetKey]) {
       askConfirm(() => {
-        state[stateKey] = state[stateKey].filter((item) => item.id !== event.target.dataset[datasetKey]);
+        const id = event.target.dataset[datasetKey];
+        if (datasetKey === "deleteCard") {
+          const card = state.cards.find((item) => item.id === id);
+          state.cards = state.cards.filter((item) => item.id !== id);
+          if (card) {
+            state.installments = state.installments.filter((item) => item.card !== card.name);
+            state.cardRecurring = state.cardRecurring.filter((item) => item.card !== card.name);
+          }
+        } else if (datasetKey === "deleteAccount") {
+          const account = state.accounts.find((item) => item.id === id);
+          state.accounts = state.accounts.filter((item) => item.id !== id);
+          if (account) state.entries = state.entries.map((item) => item.account === account.name ? { ...item, account: accountOptions()[0] || "Carteira" } : item);
+        } else {
+          state[stateKey] = state[stateKey].filter((item) => item.id !== id);
+        }
         notify("sync", "Item removido");
         commitState();
       });
@@ -2469,6 +2632,7 @@ document.addEventListener("click", (event) => {
   if (event.target.dataset.editFixed) editFixedBill(event.target.dataset.editFixed);
   if (event.target.dataset.editCard) editCard(event.target.dataset.editCard);
   if (event.target.dataset.editInstallment) editInstallment(event.target.dataset.editInstallment);
+  if (event.target.dataset.editCardRecurring) editCardRecurring(event.target.dataset.editCardRecurring);
   if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
 
   if (event.target.dataset.editCategory) {
@@ -2535,6 +2699,7 @@ document.addEventListener("click", (event) => {
       if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
       return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] };
     });
+    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] } : item);
     notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
@@ -2547,6 +2712,7 @@ document.addEventListener("click", (event) => {
       if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
       return { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth) };
     });
+    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth) } : item);
     notify("card", `Fatura reaberta: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
@@ -2561,6 +2727,18 @@ document.addEventListener("click", (event) => {
       return { ...item, paidMonths: [...paidMonths] };
     });
     notify("card", "Status da parcela atualizado");
+    commitState();
+  }
+
+  if (event.target.dataset.toggleCardRecurring) {
+    state.cardRecurring = state.cardRecurring.map((item) => {
+      if (item.id !== event.target.dataset.toggleCardRecurring) return item;
+      const paidMonths = new Set(item.paidMonths || []);
+      if (paidMonths.has(state.selectedMonth)) paidMonths.delete(state.selectedMonth);
+      else paidMonths.add(state.selectedMonth);
+      return { ...item, paidMonths: [...paidMonths] };
+    });
+    notify("card", "Status do fixo no cartão atualizado");
     commitState();
   }
 });

@@ -480,6 +480,7 @@ h2 {
 }
 
 .notification-item {
+  width: 100%;
   display: grid;
   grid-template-columns: 38px 1fr;
   gap: 10px;
@@ -488,6 +489,9 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fbfffd;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
 }
 
 .notification-item.unread {
