@@ -1180,6 +1180,18 @@ h2 {
   font-size: 13px;
 }
 
+.invoice-items span.paid {
+  color: #066447;
+  background: #e9fff4;
+  border-color: rgba(0, 168, 107, .28);
+}
+
+.invoice-items span.open {
+  color: #805000;
+  background: #fff8e8;
+  border-color: rgba(255, 176, 32, .28);
+}
+
 .invoice-items small {
   color: var(--muted);
 }
@@ -2701,6 +2713,18 @@ td.amount {
 
   body.app-ready .statement-item .expense {
     color: #ff7a70;
+  }
+
+  body.app-ready .invoice-items span.paid {
+    color: #bfffe9;
+    background: rgba(0, 191, 122, .16);
+    border-color: rgba(0, 224, 154, .34);
+  }
+
+  body.app-ready .invoice-items span.open {
+    color: #ffe3a1;
+    background: rgba(255, 176, 32, .13);
+    border-color: rgba(255, 176, 32, .32);
   }
 
   body.app-ready .empty strong {
