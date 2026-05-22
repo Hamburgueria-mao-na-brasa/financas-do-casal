@@ -1298,6 +1298,86 @@ h2 {
   line-height: 1.35;
 }
 
+.setup-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, .65fr) minmax(360px, 1.35fr);
+  gap: 18px;
+  align-items: center;
+  border-color: rgba(0, 191, 122, .22);
+  background: linear-gradient(135deg, #ffffff, #ecfff8);
+}
+
+.setup-panel p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.setup-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.setup-step {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, .78);
+  text-align: left;
+}
+
+.setup-step b {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #061b1b;
+  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  font-size: 15px;
+}
+
+.setup-step.done {
+  border-color: rgba(0, 168, 107, .30);
+  background: #e9fff4;
+}
+
+.setup-step.done b {
+  background: #00bf7a;
+}
+
+.setup-step strong,
+.setup-step small {
+  display: block;
+}
+
+.setup-step small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.32;
+}
+
+.logout-card {
+  border-color: rgba(240, 68, 56, .28);
+}
+
+.logout-card-top {
+  width: min(520px, 100%);
+  margin-bottom: 14px;
+}
+
+.logout-card b {
+  color: white;
+  background: linear-gradient(135deg, var(--red), #f57b42);
+}
+
 .profile-preview {
   display: flex;
   flex-wrap: wrap;
@@ -2236,6 +2316,37 @@ button.list-item {
     grid-template-columns: 1fr;
   }
 
+  .setup-panel {
+    grid-template-columns: 1fr;
+    margin: 0 28px;
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .14);
+  }
+
+  .setup-panel p {
+    color: #b9d7d1;
+  }
+
+  .setup-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-step {
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .12);
+  }
+
+  .setup-step.done {
+    background: rgba(0, 191, 122, .16);
+    border-color: rgba(0, 224, 154, .32);
+  }
+
+  .setup-step small {
+    color: #b9d7d1;
+  }
+
   .statement-tools {
     grid-template-columns: 1fr;
   }
@@ -2243,6 +2354,11 @@ button.list-item {
   .more-grid {
     margin: 0 28px;
     grid-template-columns: 1fr;
+  }
+
+  .logout-card-top {
+    width: auto;
+    margin: 0 28px 14px;
   }
 
   .more-card {

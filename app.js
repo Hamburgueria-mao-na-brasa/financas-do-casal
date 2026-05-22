@@ -1070,6 +1070,7 @@ function renderDashboard() {
         <button class="action-chip" data-view="cards"><b>▣</b><span>Cartão</span></button>
       </div>
     </section>
+    ${initialSetupPanel()}
     <div class="summary-grid bank-metrics compact-dashboard">
       ${metric("Saldo previsto", forecast.afterAll, forecast.afterAll >= 0 ? "good" : "bad")}
       ${metric("Próxima conta", forecast.nextBill?.value || 0, forecast.nextBill ? "warn" : "good")}
@@ -1120,6 +1121,59 @@ function renderDashboard() {
           <div class="list-item"><div><strong>Entradas vs mês anterior</strong><span>${report.incomeText}</span></div><b>${formatMoney(report.incomeDiff)}</b></div>
           <div class="list-item"><div><strong>Categoria que mais pesa</strong><span>${report.topCategory || "Sem categoria"}</span></div><b>${formatMoney(report.topCategoryValue)}</b></div>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function initialSetupPanel() {
+  const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+  const steps = [
+    {
+      done: salaryTotal > 0 || state.entries.some((item) => item.type === "Receita"),
+      icon: "R$",
+      title: "Colocar uma renda",
+      note: "Cadastre o salário médio de pelo menos uma pessoa.",
+      view: "settings"
+    },
+    {
+      done: state.accounts.length > 0,
+      icon: "≋",
+      title: "Criar uma carteira",
+      note: "Informe onde o dinheiro fica: banco, dinheiro ou conta digital.",
+      view: "accounts",
+      wallet: "money"
+    },
+    {
+      done: state.cards.length > 0,
+      icon: "▣",
+      title: "Adicionar cartão",
+      note: "Cadastre limite e cartão para fatura e compras parceladas.",
+      view: "accounts",
+      wallet: "cards"
+    },
+    {
+      done: state.fixedBills.length > 0 || state.cardRecurring.length > 0,
+      icon: "◷",
+      title: "Adicionar gastos fixos",
+      note: "Inclua aluguel, internet, assinatura ou conta mensal.",
+      view: "fixed"
+    }
+  ];
+  if (steps.every((step) => step.done)) return "";
+  return `
+    <div class="panel setup-panel">
+      <div>
+        <h2>Comece pelo básico</h2>
+        <p>Com esses dados, o app já consegue calcular saldo, fatura, contas e previsão do mês.</p>
+      </div>
+      <div class="setup-steps">
+        ${steps.map((step) => `
+          <button class="setup-step ${step.done ? "done" : ""}" type="button" data-view="${step.view}" ${step.wallet ? `data-setup-wallet="${step.wallet}"` : ""}>
+            <b>${step.done ? "✓" : step.icon}</b>
+            <span><strong>${step.title}</strong><small>${step.note}</small></span>
+          </button>
+        `).join("")}
       </div>
     </div>
   `;
@@ -1359,6 +1413,7 @@ function renderOnboarding() {
       <p>Configure o básico para o controle do casal ficar pronto para uso.</p>
     </div>
     <div class="onboarding-steps">
+      ${onboardingStep(Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0), "Cadastrar renda", "settings", "Informe o salário médio de pelo menos uma pessoa para a visão geral funcionar.")}
       ${onboardingStep(state.accounts.length, "Adicionar carteira", "accounts", "Cadastre onde o dinheiro fica: banco, dinheiro em casa ou conta digital.")}
       ${onboardingStep(state.cards.length, "Cadastrar cartão", "accounts", "Inclua o cartão e limite para acompanhar fatura e compras parceladas.")}
       ${onboardingStep(state.fixedBills.length, "Contas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
@@ -2233,6 +2288,10 @@ function renderMore() {
       <h2>Mais opções</h2>
       <p>As telas menos usadas ficam aqui para o rodapé do celular não ficar apertado.</p>
     </div>
+    <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
+      <b>↩</b>
+      <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
+    </button>
     <div class="more-grid">
       ${items.map((item) => `
         <button class="more-card" type="button" data-view="${item.view}">
@@ -2242,6 +2301,7 @@ function renderMore() {
       `).join("")}
     </div>
   `;
+  qs("#logout-more").addEventListener("click", signOut);
 }
 
 function renderSettings() {
@@ -2563,6 +2623,7 @@ document.addEventListener("click", (event) => {
 
   const tab = event.target.closest("[data-view]");
   if (tab) {
+    if (tab.dataset.setupWallet) walletTab = tab.dataset.setupWallet;
     setActiveView(tab.dataset.view);
   }
 
