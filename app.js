@@ -1886,7 +1886,7 @@ function renderCards() {
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria da compra para relatórios.")}
       ${input("value", "Valor da compra", "number", "", "0.01", "Valor total, antes de dividir em parcelas.")}
       ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
-      ${select("firstMonth", "Primeiro mês", months, "", "Mês em que a primeira parcela entra na fatura.")}
+      ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Adicionar</button>
     </form>
     <form class="entry-form" id="card-recurring-form">
@@ -1902,7 +1902,7 @@ function renderCards() {
       ${state.cards.map(cardSummary).join("") || emptyHtml()}
     </div>
     <div class="panel">
-      <h2>Faturas por cartão</h2>
+      <h2>Faturas por cartão (${state.selectedMonth})</h2>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
@@ -1950,19 +1950,20 @@ function cardInvoiceRow(card) {
   const openItems = monthItems.filter((item) => !item.paid);
   const paidTotal = total(paidItems);
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
+  const totalMonth = totals.month + paidTotal;
   return `
     <div class="invoice-card">
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+          <span>Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
         </div>
         ${openItems.length ? `<button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
       </div>
       <div class="invoice-items">
         ${monthItems.length ? monthItems.map((item) => `
           <span class="${item.paid ? "paid" : "open"}">
-            ${item.description} · ${item.partLabel} · ${item.paid ? "Pago" : "Aberto"}
+            ${item.description} · ${item.partLabel} · ${item.category || "Sem categoria"} · ${item.paid ? "Pago" : "Aberto"}
             <b>${formatMoney(item.value)}</b>
           </span>
         `).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
