@@ -1030,21 +1030,49 @@ h2 {
   flex-wrap: wrap;
 }
 
-.onboarding-steps span {
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #edf5f2;
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 13px;
+.onboarding-step {
+  min-height: 74px;
+  flex: 1 1 190px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 2px 8px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfffd;
+  color: var(--ink);
+  text-align: left;
 }
 
-.onboarding-steps span.done {
+.onboarding-step b {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--green-dark);
   background: #d8f5e7;
-  color: #066447;
+}
+
+.onboarding-step span,
+.onboarding-step small {
+  display: block;
+}
+
+.onboarding-step span {
+  font-weight: 900;
+}
+
+.onboarding-step small {
+  grid-column: 2;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.onboarding-step.done {
+  background: #d8f5e7;
+  border-color: rgba(0, 168, 107, .25);
 }
 
 .bars {
@@ -1755,7 +1783,7 @@ td.amount {
 
   .tabs {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     overflow-x: auto;
     padding-bottom: 2px;
     scrollbar-width: none;
@@ -1766,14 +1794,14 @@ td.amount {
   }
 
   .tab {
-    flex: 0 0 70px;
-    min-height: 60px;
-    padding: 8px 6px;
-    border-radius: 18px;
+    flex: 0 0 62px;
+    min-height: 54px;
+    padding: 7px 5px;
+    border-radius: 16px;
     display: grid;
     place-items: center;
     gap: 2px;
-    font-size: 18px;
+    font-size: 16px;
     color: #b9d7d1;
     background: transparent;
   }
@@ -1788,7 +1816,7 @@ td.amount {
   }
 
   .tab[data-view="entries"] {
-    flex-basis: 82px;
+    flex-basis: 72px;
   }
 
   .tab[data-view="entries"].active {
@@ -1800,7 +1828,7 @@ td.amount {
   .tab span {
     display: block;
     max-width: 100%;
-    font-size: 9.5px;
+    font-size: 8.5px;
     line-height: 1.1;
     text-align: center;
     white-space: normal;
@@ -1820,6 +1848,14 @@ td.amount {
       radial-gradient(circle at 82% 16%, rgba(0, 194, 199, .18), transparent 30%),
       linear-gradient(180deg, #071313 0%, #082727 100%);
     border-bottom: 1px solid rgba(183, 255, 238, .10);
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .topbar {
+    display: none;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .shell {
+    padding-top: 16px;
   }
 
   .mobile-app-brand {
@@ -1872,15 +1908,19 @@ td.amount {
 
   .cloud-panel {
     display: grid;
-    grid-template-columns: 1fr 48px 48px;
-    width: 100%;
+    grid-template-columns: 44px 44px;
+    width: auto;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 55;
     justify-content: stretch;
     gap: 8px;
   }
 
   .top-status,
   .notif-button {
-    min-height: 48px;
+    min-height: 44px;
     width: 100%;
     border-radius: 16px;
     color: #f2fff9;
@@ -1890,6 +1930,7 @@ td.amount {
   }
 
   .top-status {
+    display: none;
     min-width: 0;
     padding: 7px 12px;
   }
@@ -1903,9 +1944,10 @@ td.amount {
   }
 
   .notif-button {
-    height: 48px;
+    height: 44px;
     padding: 0;
-    font-size: 18px;
+    font-size: 16px;
+    backdrop-filter: blur(14px);
   }
 
   .top-status span {
@@ -1962,6 +2004,17 @@ td.amount {
 
   .onboarding {
     grid-template-columns: 1fr;
+  }
+
+  .onboarding-step {
+    flex-basis: 100%;
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .06);
+    border-color: rgba(183, 255, 238, .12);
+  }
+
+  .onboarding-step.done {
+    background: rgba(0, 191, 122, .12);
   }
 
   .summary-grid {

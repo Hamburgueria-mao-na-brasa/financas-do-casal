@@ -173,6 +173,7 @@ function render() {
   saveState(false);
   renderGate();
   if (!currentUser || !cloudReady) return;
+  document.body.dataset.view = document.querySelector(".view.active")?.id || "dashboard";
   renderCloudPanel();
   renderMonthFilter();
   renderDashboard();
@@ -1161,10 +1162,11 @@ function renderOnboarding() {
       <p>Configure o básico para o controle do casal ficar pronto para uso.</p>
     </div>
     <div class="onboarding-steps">
-      ${onboardingStep(state.accounts.length, "Adicionar dinheiro na carteira")}
-      ${onboardingStep(state.cards.length, "Cadastrar um cartão")}
-      ${onboardingStep(state.entries.length || state.installments.length, "Fazer o primeiro lançamento")}
-      ${onboardingStep(householdInviteCode, "Convidar companheiro")}
+      ${onboardingStep(state.accounts.length, "Adicionar carteira", "accounts", "Cadastre onde o dinheiro fica: banco, dinheiro em casa ou conta digital.")}
+      ${onboardingStep(state.cards.length, "Cadastrar cartão", "accounts", "Inclua o cartão e limite para acompanhar fatura e compras parceladas.")}
+      ${onboardingStep(state.fixedBills.length, "Contas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
+      ${onboardingStep(state.entries.length || state.installments.length, "Primeiro lançamento", "entries", "Registre uma entrada ou saída para começar o histórico do mês.")}
+      ${onboardingStep(householdInviteCode, "Convidar parceiro", "settings", "Mostre o código em Configurações da conta e envie para seu parceiro.")}
     </div>
     <button class="ghost" id="finish-onboarding" type="button">Ocultar checklist</button>
   `;
@@ -1174,10 +1176,19 @@ function renderOnboarding() {
     notify("sync", "Checklist inicial concluído");
     commitState();
   });
+  document.querySelectorAll("[data-onboarding-view]").forEach((button) => {
+    button.addEventListener("click", () => setActiveView(button.dataset.onboardingView));
+  });
 }
 
-function onboardingStep(done, text) {
-  return `<span class="${done ? "done" : ""}">${done ? "✓" : "•"} ${text}</span>`;
+function onboardingStep(done, text, view, detail) {
+  return `
+    <button class="onboarding-step ${done ? "done" : ""}" type="button" data-onboarding-view="${view}">
+      <b>${done ? "✓" : "•"}</b>
+      <span>${text}</span>
+      <small>${detail}</small>
+    </button>
+  `;
 }
 
 function coupleIllustration(mood) {
@@ -2037,6 +2048,14 @@ function emptyHtml() {
   return qs("#empty-state").innerHTML;
 }
 
+function setActiveView(view) {
+  document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === view));
+  qs("#page-title").textContent = pageTitle(view);
+  document.body.dataset.view = view;
+  window.scrollTo?.({ top: 0, behavior: "smooth" });
+}
+
 document.addEventListener("click", (event) => {
   if (
     notificationsOpen &&
@@ -2049,9 +2068,7 @@ document.addEventListener("click", (event) => {
 
   const tab = event.target.closest("[data-view]");
   if (tab) {
-    document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
-    document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.view));
-    qs("#page-title").textContent = pageTitle(tab.dataset.view);
+    setActiveView(tab.dataset.view);
   }
 
   const deleteMap = [
@@ -2073,9 +2090,7 @@ document.addEventListener("click", (event) => {
 
   if (event.target.dataset.editEntry) {
     editingEntryId = event.target.dataset.editEntry;
-    document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === "entries"));
-    document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === "entries"));
-    qs("#page-title").textContent = pageTitle("entries");
+    setActiveView("entries");
     renderEntries();
   }
 
