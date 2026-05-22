@@ -229,7 +229,7 @@ function renderGate(message = "") {
         <p>${isForgot ? "Informe seu e-mail para receber um link seguro e criar uma senha." : isSignup ? "Crie sua conta e comece com tudo zerado. Depois convide seu companheiro para compartilhar os mesmos dados." : "Acesse seu painel financeiro do casal com segurança."}</p>
         <form id="login-form" class="auth-actions">
           <label class="field"><span>E-mail</span><input name="email" type="email" placeholder="voce@email.com" required></label>
-          ${isForgot ? "" : `<label class="field"><span>Senha</span><input name="password" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required></label>`}
+          ${isForgot ? "" : passwordField("Senha")}
           <button class="primary" type="submit">${isForgot ? "Enviar link para senha" : isSignup ? "Criar conta" : "Entrar"}</button>
           ${isForgot ? `<button class="ghost" id="toggle-auth" type="button">Voltar para entrar</button>` : `<button class="ghost" id="toggle-auth" type="button">${isSignup ? "Já tenho conta" : "Criar uma conta nova"}</button>`}
           ${isSignup || isForgot ? "" : `<button class="ghost" id="forgot-password" type="button">Definir ou recuperar senha</button>`}
@@ -261,7 +261,7 @@ function renderGate(message = "") {
         <h1>Criar nova senha</h1>
         <p>Defina uma senha para entrar direto na sua conta das próximas vezes.</p>
         <form id="new-password-form" class="auth-actions">
-          <label class="field"><span>Nova senha</span><input name="password" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required></label>
+          ${passwordField("Nova senha")}
           <button class="primary" type="submit">Salvar senha</button>
         </form>
         ${message ? `<p class="mini-status">${message}</p>` : ""}
@@ -319,7 +319,7 @@ function renderGate(message = "") {
 
 function renderCloudPanel(message = "") {
   const panel = qs("#cloud-panel");
-  const inviteLink = getInviteLink();
+  const inviteCode = householdInviteCode || "";
 
   if (!cloud) {
     panel.innerHTML = `<span class="mini-status">Modo local</span>`;
@@ -336,8 +336,8 @@ function renderCloudPanel(message = "") {
     <button class="notif-button" id="toggle-privacy" type="button" title="Ocultar valores">${state.privacyMode ? "🙈" : "👁"}</button>
     <span class="mini-status"><i class="dot"></i> Online</span>
     ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
-    ${inviteLink ? `<span class="mini-status invite-link" title="${inviteLink}">Convite do companheiro</span>` : ""}
-    <button class="ghost" id="copy-invite" type="button">Adicionar companheiro</button>
+    ${inviteCode ? `<span class="mini-status invite-code" title="Código do cofre"><b>Código</b><code>${inviteCode}</code></span>` : ""}
+    <button class="ghost" id="copy-invite" type="button">Copiar código</button>
     <button class="ghost" id="join-by-code" type="button">Entrar com código</button>
     <button class="ghost" id="logout" type="button">Sair</button>
     ${message ? `<span class="mini-status">${message}</span>` : ""}
@@ -529,15 +529,15 @@ function notificationIcon(type) {
 }
 
 async function copyInviteLink() {
-  const inviteLink = getInviteLink();
-  if (!inviteLink) return;
+  const inviteCode = householdInviteCode;
+  if (!inviteCode) return;
   try {
-    await navigator.clipboard.writeText(inviteLink);
-    notify("invite", "Link de convite copiado");
+    await navigator.clipboard.writeText(inviteCode);
+    notify("invite", `Código de convite copiado: ${inviteCode}`);
     await commitState();
-    renderCloudPanel("Link copiado");
+    renderCloudPanel("Código copiado");
   } catch {
-    renderCloudPanel(inviteLink);
+    renderCloudPanel(inviteCode);
   }
 }
 
@@ -1735,6 +1735,18 @@ function labelWithHelp(label, help = "") {
   return `${label}${help ? `<button class="help-dot" type="button" title="${help}" aria-label="${help}">?</button>` : ""}`;
 }
 
+function passwordField(label) {
+  return `
+    <label class="field">
+      <span>${label}</span>
+      <div class="password-wrap">
+        <input name="password" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required>
+        <button class="show-password" type="button" data-toggle-password>Ver</button>
+      </div>
+    </label>
+  `;
+}
+
 function input(name, label, type, value = "", step = "", help = "") {
   return `<label class="field"><span>${labelWithHelp(label, help)}</span><input name="${name}" type="${type}" value="${value}" ${step ? `step="${step}"` : ""} required></label>`;
 }
@@ -1831,6 +1843,16 @@ document.addEventListener("click", (event) => {
   if (help) {
     event.preventDefault();
     alert(help.getAttribute("aria-label") || help.title || "Ajuda deste campo.");
+  }
+
+  const passwordToggle = event.target.closest("[data-toggle-password]");
+  if (passwordToggle) {
+    const wrap = passwordToggle.closest(".password-wrap");
+    const input = wrap?.querySelector("input");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    passwordToggle.textContent = show ? "Ocultar" : "Ver";
   }
 
   if (event.target.dataset.payCardMonth) {
