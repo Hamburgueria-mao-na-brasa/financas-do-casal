@@ -1752,8 +1752,8 @@ function statementRow(item) {
 function renderFixedBills() {
   qs("#fixed").innerHTML = `
     <div class="panel helper-panel">
-      <h2>Gastos fixos</h2>
-      <p>Cadastre aluguel, internet, energia, água, financiamentos e dívidas mensais. O status de pago vale para o mês selecionado.</p>
+      <h2>Gastos fixos fora do cartão</h2>
+      <p>Use aqui para contas pagas por Pix, boleto, dinheiro ou débito. Se a conta cai na fatura, cadastre em <strong>Cartões &gt; Fixo mensal no cartão</strong>.</p>
     </div>
     <form class="settings-form" id="fixed-form">
       <div class="span-3"><h2>Adicionar gasto fixo</h2></div>
@@ -1877,9 +1877,10 @@ function renderCards() {
   qs("#cards").innerHTML = `
     <div class="panel helper-panel">
       <h2>Compras no cartão</h2>
-      <p>Use esta tela para lançar compras parceladas e acompanhar as faturas. Para criar ou alterar cartões, vá em <strong>Nossa Carteira</strong>.</p>
+      <p>Use esta tela para tudo que cai na fatura: compras parceladas, assinaturas, internet no cartão e pagamento/reabertura da fatura.</p>
     </div>
     <form class="entry-form" id="card-form">
+      <div class="span-3 form-heading"><span>1</span><h2>Compra parcelada ou compra no crédito</h2><small>Ex: compra de R$ 600 em 6x aparece como R$ 100 por mês.</small></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada.")}
       ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
       ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
@@ -1890,7 +1891,7 @@ function renderCards() {
       <button class="primary" type="submit">Adicionar</button>
     </form>
     <form class="entry-form" id="card-recurring-form">
-      <div class="span-3"><h2>Adicionar fixo no cartão</h2></div>
+      <div class="span-3 form-heading"><span>2</span><h2>Fixo mensal no cartão</h2><small>Ex: internet, streaming, assinatura e cobranças que entram todo mês na fatura.</small></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -1902,19 +1903,19 @@ function renderCards() {
       ${state.cards.map(cardSummary).join("") || emptyHtml()}
     </div>
     <div class="panel">
-      <h2>Faturas por cartão (${state.selectedMonth})</h2>
+      <div class="section-title"><span>3</span><div><h2>Faturas por cartão (${state.selectedMonth})</h2><small>Confira aberto, pago, parcelas e fixos do mês.</small></div></div>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
-      <h2>Fixos no cartão</h2>
+      <div class="section-title"><span>4</span><div><h2>Fixos cadastrados no cartão</h2><small>Assinaturas e contas mensais que entram na fatura.</small></div></div>
       <div class="list">
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
-      <h2>Compras recentes</h2>
+      <div class="section-title"><span>5</span><div><h2>Compras recentes</h2><small>Atalho para editar ou excluir compras do cartão.</small></div></div>
       ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], cardTableRows.map((item) => [
         item.description,
         item.card,
@@ -2293,6 +2294,15 @@ function renderMore() {
       <b>↩</b>
       <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
     </button>
+    <div class="panel flow-panel">
+      <h2>Como o app se organiza</h2>
+      <div class="flow-steps">
+        <button type="button" data-view="accounts"><b>1</b><strong>Configurar</strong><small>Carteira, cartões e renda.</small></button>
+        <button type="button" data-view="entries"><b>2</b><strong>Lançar</strong><small>Entradas e saídas do dia a dia.</small></button>
+        <button type="button" data-view="cards"><b>3</b><strong>Fatura</strong><small>Parcelas, assinaturas e fixos no cartão.</small></button>
+        <button type="button" data-view="statement"><b>4</b><strong>Acompanhar</strong><small>Extrato, pagos, pendentes e edição.</small></button>
+      </div>
+    </div>
     <div class="more-grid">
       ${items.map((item) => `
         <button class="more-card" type="button" data-view="${item.view}">
