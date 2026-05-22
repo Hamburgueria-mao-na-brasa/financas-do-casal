@@ -1505,6 +1505,13 @@ td.amount {
   white-space: nowrap;
 }
 
+.statement-actions {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .statement-icon {
   width: 44px;
   height: 44px;
@@ -1989,8 +1996,10 @@ td.amount {
   .notifications-panel {
     left: 12px;
     right: 12px;
-    top: 76px;
+    top: 66px;
     width: auto;
+    z-index: 80;
+    max-height: calc(100vh - 160px);
   }
 
   .fab {
@@ -2096,7 +2105,8 @@ td.amount {
   }
 
   .statement-item {
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 9px;
   }
 
   .insight-grid {
@@ -2104,7 +2114,18 @@ td.amount {
   }
 
   .statement-item b {
-    grid-column: 2;
+    grid-column: 3;
+  }
+
+  .statement-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  .statement-actions {
+    grid-column: 2 / -1;
   }
 
   .bar-row {

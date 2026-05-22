@@ -158,6 +158,7 @@ function pageTitle(view) {
   return {
     dashboard: "Visão geral",
     entries: "Lançamentos",
+    statement: "Extrato",
     fixed: "Contas Fixas",
     cards: "Cartões",
     accounts: "Nossa Carteira",
@@ -179,6 +180,7 @@ function render() {
   renderDashboard();
   renderOnboarding();
   renderEntries();
+  renderStatement();
   renderFixedBills();
   renderCards();
   renderAccounts();
@@ -1166,6 +1168,7 @@ function renderOnboarding() {
       ${onboardingStep(state.cards.length, "Cadastrar cartão", "accounts", "Inclua o cartão e limite para acompanhar fatura e compras parceladas.")}
       ${onboardingStep(state.fixedBills.length, "Contas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
       ${onboardingStep(state.entries.length || state.installments.length, "Primeiro lançamento", "entries", "Registre uma entrada ou saída para começar o histórico do mês.")}
+      ${onboardingStep(state.entries.length || state.installments.length, "Ver extrato", "statement", "Acompanhe tudo que já foi lançado, inclusive pagos e pendentes.")}
       ${onboardingStep(householdInviteCode, "Convidar parceiro", "settings", "Mostre o código em Configurações da conta e envie para seu parceiro.")}
     </div>
     <button class="ghost" id="finish-onboarding" type="button">Ocultar checklist</button>
@@ -1389,21 +1392,87 @@ function accountOptions() {
   return state.accounts.length ? state.accounts.map((item) => item.name) : ["Carteira"];
 }
 
+function renderStatement() {
+  const rows = [
+    ...state.entries.map((item) => ({
+      id: item.id,
+      kind: item.type === "Receita" ? "Entrada" : "Saída",
+      date: item.date,
+      title: item.description || item.category,
+      detail: `${item.category} · ${item.person} · ${item.status}`,
+      value: Number(item.value || 0),
+      tone: item.type === "Receita" ? "income" : "expense",
+      action: `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
+    })),
+    ...state.installments.flatMap((item) => getInstallmentSchedule(item)
+      .filter((part) => part.month === state.selectedMonth)
+      .map((part, index) => ({
+        id: `${item.id}-${index}`,
+        kind: "Cartão",
+        date: item.date,
+        title: item.description,
+        detail: `${item.card} · parcela ${index + 1}/${item.parts} · ${part.paid ? "Pago" : "Aberto"}`,
+        value: Number(part.value || 0),
+        tone: "card",
+        action: `<button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
+      }))),
+    ...(state.fixedBills || []).map((item) => ({
+      id: item.id,
+      kind: "Conta fixa",
+      date: fixedDateForMonth(item),
+      title: item.name,
+      detail: `${item.category} · ${item.person} · ${isFixedPaid(item) ? "Pago" : "Pendente"}`,
+      value: Number(item.value || 0),
+      tone: isFixedPaid(item) ? "fixed-paid" : "fixed-pending",
+      action: `<button class="tiny ghost" data-toggle-fixed="${item.id}">${isFixedPaid(item) ? "Marcar pendente" : "Marcar pago"}</button>`
+    }))
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  qs("#statement").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Extrato do mês</h2>
+      <p>Veja tudo que foi lançado em ${state.selectedMonth}: entradas, saídas, faturas e contas fixas. Se marcou algo errado, altere aqui.</p>
+    </div>
+    <div class="statement-list panel">
+      ${rows.length ? rows.map(statementRow).join("") : emptyHtml()}
+    </div>
+  `;
+}
+
+function fixedDateForMonth(item) {
+  const year = new Date().getFullYear();
+  return new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+}
+
+function statementRow(item) {
+  return `
+    <div class="statement-item ${item.tone}">
+      <div class="statement-icon">${item.kind.slice(0, 1)}</div>
+      <div>
+        <strong>${item.title}</strong>
+        <span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.kind} · ${item.detail}</span>
+      </div>
+      <b>${formatMoney(item.value)}</b>
+      <div class="statement-actions">${item.action}</div>
+    </div>
+  `;
+}
+
 function renderFixedBills() {
   qs("#fixed").innerHTML = `
     <div class="panel helper-panel">
-      <h2>Contas Fixas</h2>
-      <p>Cadastre aluguel, internet, energia, água, financiamentos e dívidas mensais. Marque como pago quando o dinheiro sair.</p>
+      <h2>Gastos fixos</h2>
+      <p>Cadastre aluguel, internet, energia, água, financiamentos e dívidas mensais. O status de pago vale para o mês selecionado.</p>
     </div>
     <form class="settings-form" id="fixed-form">
-      <div class="span-3"><h2>Adicionar conta fixa</h2></div>
+      <div class="span-3"><h2>Adicionar gasto fixo</h2></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
       ${input("value", "Valor", "number", "0", "0.01", "Valor mensal dessa conta.")}
       ${input("dueDay", "Vencimento", "number", "10", "1", "Dia do mês em que vence.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa conta fixa.")}
       ${select("person", "Responsável", appPeople(), "", "Quem costuma pagar ou acompanhar essa conta.")}
       ${select("status", "Status", ["Pendente", "Pago"], "Pendente", "Pago entra no cálculo do saldo. Pendente aparece em atenção.")}
-      <button class="primary form-submit" type="submit">Salvar conta fixa</button>
+      <button class="primary form-submit" type="submit">Salvar gasto fixo</button>
     </form>
     <div class="wallet-list">
       ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
@@ -2053,7 +2122,6 @@ function setActiveView(view) {
   document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === view));
   qs("#page-title").textContent = pageTitle(view);
   document.body.dataset.view = view;
-  window.scrollTo?.({ top: 0, behavior: "smooth" });
 }
 
 document.addEventListener("click", (event) => {
