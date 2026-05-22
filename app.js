@@ -78,6 +78,7 @@ function ensureStateShape() {
   state.notifications ||= [];
   state.accounts ||= [];
   state.cards ||= [];
+  state.cards = state.cards.map((item) => ({ ...item, closeDay: Number(item.closeDay || 20), dueDay: Number(item.dueDay || 10) }));
   state.entries ||= [];
   state.installments ||= [];
   state.installments = state.installments.map((item) => ({ ...item, paidMonths: item.paidMonths || [] }));
@@ -631,6 +632,8 @@ function saveEditModal(event) {
       const oldName = item.name;
       item.name = data.name;
       item.limit = Number(data.limit || 0);
+      item.closeDay = Number(data.closeDay || 20);
+      item.dueDay = Number(data.dueDay || 10);
       state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
       state.cardRecurring = state.cardRecurring.map((fixed) => fixed.card === oldName ? { ...fixed, card: item.name } : fixed);
     }
@@ -1786,8 +1789,8 @@ function renderAgenda() {
     return {
       type: "Fatura",
       title: card.name,
-      date: new Date(new Date().getFullYear(), monthIndex(state.selectedMonth), 28),
-      detail: `Fatura aberta em ${state.selectedMonth}`,
+      date: new Date(new Date().getFullYear(), monthIndex(state.selectedMonth), Math.min(Number(card.dueDay || 10), 28)),
+      detail: `Vence dia ${card.dueDay || 10} · fecha dia ${card.closeDay || 20}`,
       value: totals.month,
       priority: totals.month > 0 ? "soon" : "normal"
     };
@@ -1877,10 +1880,10 @@ function renderCards() {
   qs("#cards").innerHTML = `
     <div class="panel helper-panel">
       <h2>Compras no cartão</h2>
-      <p>Use esta tela para tudo que cai na fatura: compras parceladas, assinaturas, internet no cartão e pagamento/reabertura da fatura.</p>
+      <p>Faturas, parcelas e assinaturas em um só lugar.</p>
     </div>
     <form class="entry-form" id="card-form">
-      <div class="span-3 form-heading"><span>1</span><h2>Compra parcelada ou compra no crédito</h2><small>Ex: compra de R$ 600 em 6x aparece como R$ 100 por mês.</small></div>
+      <div class="span-3 form-heading"><span>+</span><h2>Compra no crédito</h2></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada.")}
       ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
       ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
@@ -1891,7 +1894,7 @@ function renderCards() {
       <button class="primary" type="submit">Adicionar</button>
     </form>
     <form class="entry-form" id="card-recurring-form">
-      <div class="span-3 form-heading"><span>2</span><h2>Fixo mensal no cartão</h2><small>Ex: internet, streaming, assinatura e cobranças que entram todo mês na fatura.</small></div>
+      <div class="span-3 form-heading"><span>↻</span><h2>Fixo mensal no cartão</h2></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -1903,19 +1906,19 @@ function renderCards() {
       ${state.cards.map(cardSummary).join("") || emptyHtml()}
     </div>
     <div class="panel">
-      <div class="section-title"><span>3</span><div><h2>Faturas por cartão (${state.selectedMonth})</h2><small>Confira aberto, pago, parcelas e fixos do mês.</small></div></div>
+      <div class="section-title"><span>▣</span><div><h2>Faturas (${state.selectedMonth})</h2></div></div>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
-      <div class="section-title"><span>4</span><div><h2>Fixos cadastrados no cartão</h2><small>Assinaturas e contas mensais que entram na fatura.</small></div></div>
+      <div class="section-title"><span>↻</span><div><h2>Fixos no cartão</h2></div></div>
       <div class="list">
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
-      <div class="section-title"><span>5</span><div><h2>Compras recentes</h2><small>Atalho para editar ou excluir compras do cartão.</small></div></div>
+      <div class="section-title"><span>☷</span><div><h2>Compras recentes</h2></div></div>
       ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], cardTableRows.map((item) => [
         item.description,
         item.card,
@@ -1957,7 +1960,7 @@ function cardInvoiceRow(card) {
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+          <span>Fecha dia ${card.closeDay || 20} · vence dia ${card.dueDay || 10} · Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
         </div>
         ${openItems.length ? `<button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
       </div>
@@ -2006,6 +2009,8 @@ function cardSummary(card) {
       <span>Limite total</span><b>${formatMoney(card.limit)}</b>
       <span>Disponível</span><b>${formatMoney(available)}</b>
       <span>Fatura do mês</span><b>${formatMoney(totals.month)}</b>
+      <span>Fechamento</span><b>dia ${card.closeDay || 20}</b>
+      <span>Vencimento</span><b>dia ${card.dueDay || 10}</b>
     </div>
     <div class="track card-track"><div class="fill" style="--w:${percent}%;--c:rgba(255,255,255,.88)"></div></div>
     <div class="card-actions">
@@ -2092,6 +2097,8 @@ function renderAccounts() {
       <div class="span-3"><h2>Adicionar cartão de crédito</h2></div>
       ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Neon, Inter, cartão do mercado.")}
       ${input("limit", "Limite total", "number", "0", "0.01", "Limite aprovado no cartão de crédito.")}
+      ${input("closeDay", "Fecha dia", "number", "20", "1", "Dia em que a fatura fecha.")}
+      ${input("dueDay", "Vence dia", "number", "10", "1", "Dia em que a fatura vence.")}
       ${select("color", "Cor", ["Verde", "Azul", "Roxo", "Dourado", "Preto"], "", "Só muda a aparência do cartão no app.")}
       <button class="primary" type="submit">Adicionar cartão</button>
     </form>
@@ -2294,15 +2301,6 @@ function renderMore() {
       <b>↩</b>
       <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
     </button>
-    <div class="panel flow-panel">
-      <h2>Como o app se organiza</h2>
-      <div class="flow-steps">
-        <button type="button" data-view="accounts"><b>1</b><strong>Configurar</strong><small>Carteira, cartões e renda.</small></button>
-        <button type="button" data-view="entries"><b>2</b><strong>Lançar</strong><small>Entradas e saídas do dia a dia.</small></button>
-        <button type="button" data-view="cards"><b>3</b><strong>Fatura</strong><small>Parcelas, assinaturas e fixos no cartão.</small></button>
-        <button type="button" data-view="statement"><b>4</b><strong>Acompanhar</strong><small>Extrato, pagos, pendentes e edição.</small></button>
-      </div>
-    </div>
     <div class="more-grid">
       ${items.map((item) => `
         <button class="more-card" type="button" data-view="${item.view}">
@@ -2525,7 +2523,14 @@ function addCategory(event) {
 function addCard(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  state.cards.push({ id: crypto.randomUUID(), name: data.name, limit: Number(data.limit || 0), color: data.color || "Verde" });
+  state.cards.push({
+    id: crypto.randomUUID(),
+    name: data.name,
+    limit: Number(data.limit || 0),
+    closeDay: Number(data.closeDay || 20),
+    dueDay: Number(data.dueDay || 10),
+    color: data.color || "Verde"
+  });
   notify("card", `Cartão cadastrado: ${data.name} · limite ${formatMoney(Number(data.limit || 0))}`);
   commitState();
 }
@@ -2535,7 +2540,9 @@ function editCard(id) {
   if (!item) return;
   modalMode = { kind: "card", id, fields: [
     { name: "name", label: "Nome", value: item.name },
-    { name: "limit", label: "Limite", type: "number", step: "0.01", value: item.limit }
+    { name: "limit", label: "Limite", type: "number", step: "0.01", value: item.limit },
+    { name: "closeDay", label: "Fecha dia", type: "number", step: "1", value: item.closeDay || 20 },
+    { name: "dueDay", label: "Vence dia", type: "number", step: "1", value: item.dueDay || 10 }
   ] };
   renderModal();
 }

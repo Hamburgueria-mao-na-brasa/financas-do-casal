@@ -1369,16 +1369,17 @@ h2 {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding-bottom: 4px;
 }
 
 .form-heading span,
 .section-title > span {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 12px;
+  border-radius: 11px;
   color: #061b1b;
   background: linear-gradient(135deg, #00bf7a, #17a8ff);
   font-weight: 900;
@@ -1387,6 +1388,7 @@ h2 {
 .form-heading h2,
 .section-title h2 {
   margin: 0;
+  font-size: 18px;
 }
 
 .form-heading small,
@@ -1397,48 +1399,6 @@ h2 {
   line-height: 1.35;
 }
 
-.flow-panel {
-  margin-bottom: 14px;
-}
-
-.flow-steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.flow-steps button {
-  min-height: 96px;
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  color: var(--ink);
-  background: #fbfffd;
-  text-align: left;
-}
-
-.flow-steps b {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  color: #061b1b;
-  background: linear-gradient(135deg, #ffcf43, #00e09a);
-}
-
-.flow-steps strong,
-.flow-steps small {
-  display: block;
-}
-
-.flow-steps small {
-  color: var(--muted);
-  line-height: 1.3;
-}
 
 .logout-card {
   border-color: rgba(240, 68, 56, .28);
@@ -1524,8 +1484,17 @@ h2 {
   display: grid;
   grid-template-columns: repeat(6, minmax(130px, 1fr));
   gap: 12px;
-  padding: 16px;
+  padding: 18px;
   align-items: end;
+}
+
+#cards .entry-form {
+  border-radius: 18px;
+}
+
+#cards .panel,
+#cards .entry-form {
+  box-shadow: 0 18px 38px rgba(22, 52, 47, .10);
 }
 
 .settings-stack {
@@ -2430,26 +2399,6 @@ button.list-item {
 
   .form-heading small,
   .section-title small {
-    color: #b9d7d1;
-  }
-
-  .flow-panel {
-    margin-left: 28px;
-    margin-right: 28px;
-  }
-
-  .flow-steps {
-    grid-template-columns: 1fr;
-  }
-
-  .flow-steps button {
-    min-height: 76px;
-    color: #f2fff9;
-    background: rgba(255, 255, 255, .07);
-    border-color: rgba(183, 255, 238, .12);
-  }
-
-  .flow-steps small {
     color: #b9d7d1;
   }
 
