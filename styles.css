@@ -1188,6 +1188,92 @@ h2 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.statement-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) minmax(320px, 1.1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.today-panel {
+  border-color: rgba(0, 191, 122, .22);
+  background: linear-gradient(135deg, #ffffff, #ecfff8);
+}
+
+.today-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.today-grid div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .74);
+}
+
+.today-grid span,
+.today-grid strong {
+  display: block;
+}
+
+.today-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.today-grid strong {
+  margin-top: 5px;
+  color: var(--green-dark);
+  font-size: 20px;
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.more-card {
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.more-card b {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #061b1b;
+  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  font-size: 23px;
+}
+
+.more-card strong,
+.more-card small {
+  display: block;
+}
+
+.more-card small {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .profile-preview {
   display: flex;
   flex-wrap: wrap;
@@ -1836,7 +1922,8 @@ td.amount {
   }
 
   .tab {
-    flex: 0 0 62px;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 54px;
     padding: 7px 5px;
     border-radius: 16px;
@@ -1858,7 +1945,7 @@ td.amount {
   }
 
   .tab[data-view="entries"] {
-    flex-basis: 72px;
+    flex-basis: 0;
   }
 
   .tab[data-view="entries"].active {
@@ -1874,6 +1961,14 @@ td.amount {
     line-height: 1.1;
     text-align: center;
     white-space: normal;
+  }
+
+  .tab[data-view="cards"],
+  .tab[data-view="accounts"],
+  .tab[data-view="method"],
+  .tab[data-view="goals"],
+  .tab[data-view="settings"] {
+    display: none;
   }
 
   .shell {
@@ -2103,6 +2198,41 @@ td.amount {
 
   .grid-3 {
     grid-template-columns: 1fr;
+  }
+
+  .statement-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .more-grid {
+    margin: 0 28px;
+    grid-template-columns: 1fr;
+  }
+
+  .more-card {
+    min-height: 86px;
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .14);
+  }
+
+  .more-card small {
+    color: #b9d7d1;
+  }
+
+  .today-panel {
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .14);
+  }
+
+  .today-grid div {
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .12);
+  }
+
+  .today-grid strong {
+    color: #00e09a;
   }
 
   .bank-home {

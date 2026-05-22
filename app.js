@@ -43,6 +43,8 @@ let editingEntryId = null;
 let tutorialStep = 0;
 let inviteCodeVisible = false;
 let entryFilter = "Todos";
+let statementFilter = "Todos";
+let statementSearch = "";
 let confirmAction = null;
 
 const tutorialSteps = [
@@ -166,12 +168,14 @@ function pageTitle(view) {
     accounts: "Nossa Carteira",
     method: "Método 50/30/20",
     goals: "Metas financeiras",
-    settings: "Cadastros"
+    settings: "Cadastros",
+    more: "Mais opções"
   }[view];
 }
 
 function render() {
   ensureStateShape();
+  ensureMoreNavigation();
   ensureSmartNotifications();
   saveState(false);
   renderGate();
@@ -190,6 +194,7 @@ function render() {
   renderMethod();
   renderGoals();
   renderSettings();
+  renderMore();
   renderTutorial();
 }
 
@@ -557,7 +562,7 @@ function renderModal() {
 }
 
 function editModalHtml(config) {
-  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
+  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
   const fields = config.fields.map((field) => input(field.name, field.label, field.type || "text", field.value ?? "", field.step || "")).join("");
   return `
     <div class="modal-card">
@@ -599,6 +604,20 @@ function saveEditModal(event) {
       item.name = data.name;
       item.limit = Number(data.limit || 0);
       state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
+    }
+  }
+  if (data.kind === "installment") {
+    const item = state.installments.find((installment) => installment.id === data.id);
+    if (item) {
+      Object.assign(item, {
+        date: data.date,
+        card: data.card,
+        description: data.description,
+        category: data.category,
+        value: Number(data.value || 0),
+        parts: Math.max(1, Number(data.parts || 1)),
+        firstMonth: data.firstMonth
+      });
     }
   }
   if (data.kind === "goal") {
@@ -963,6 +982,16 @@ function renderMonthFilter() {
   select.innerHTML = months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("");
 }
 
+function ensureMoreNavigation() {
+  const tabs = qs(".tabs");
+  if (tabs && !qs('[data-view="more"]', tabs)) {
+    tabs.insertAdjacentHTML("beforeend", `<button class="tab tab-more" data-view="more" title="Mais">☰ <span>Mais</span></button>`);
+  }
+  if (!qs("#more")) {
+    qs(".shell").insertAdjacentHTML("beforeend", `<section class="view" id="more"></section>`);
+  }
+}
+
 function renderDashboard() {
   const summary = currentSummary();
   const forecast = monthForecast(summary);
@@ -999,6 +1028,7 @@ function renderDashboard() {
     const expense = total(personEntries.filter((item) => item.type === "Despesa"));
     return { name, income, expense, balance: income - expense };
   });
+  const today = todaySummary();
 
   qs("#dashboard").innerHTML = `
     <section class="bank-home">
@@ -1037,6 +1067,16 @@ function renderDashboard() {
       ${metric("Guardado em metas", summary.goalsSaved, "info")}
     </div>
     <div class="grid-2">
+      <div class="panel today-panel">
+        <h2>Hoje</h2>
+        <div class="today-grid">
+          <div><span>Entrou</span><strong>${formatMoney(today.income)}</strong></div>
+          <div><span>Saiu</span><strong>${formatMoney(today.expense)}</strong></div>
+          <div><span>Vence hoje</span><strong>${today.dueToday}</strong></div>
+          <div><span>Atrasadas</span><strong>${today.overdue}</strong></div>
+        </div>
+        <button class="ghost" type="button" data-view="agenda">Ver agenda</button>
+      </div>
       <div class="panel">
         <h2>Previsão do mês</h2>
         <div class="list">
@@ -1271,6 +1311,20 @@ function dashboardInsights(summary) {
     { label: "Maior gasto", value: biggest ? formatMoney(biggest.value) : formatMoney(0), note: biggest?.description || "Sem gastos no mês" },
     { label: "Categoria destaque", value: topCategory ? formatMoney(topCategory[1]) : formatMoney(0), note: topCategory?.[0] || "Sem categoria" }
   ];
+}
+
+function todaySummary() {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayEntries = state.entries.filter((item) => item.date === todayKey);
+  const income = total(todayEntries.filter((item) => item.type === "Receita"));
+  const expense = total(todayEntries.filter((item) => item.type === "Despesa"));
+  const fixed = fixedBillsWithDueInfo().filter((item) => !isFixedPaid(item));
+  return {
+    income,
+    expense,
+    dueToday: fixed.filter((item) => item.diffDays === 0).length,
+    overdue: fixed.filter((item) => item.diffDays < 0).length
+  };
 }
 
 function fixedToPendingEntry(item) {
@@ -1557,7 +1611,7 @@ function accountOptions() {
 }
 
 function renderStatement() {
-  const rows = [
+  let rows = [
     ...state.entries.map((item) => ({
       id: item.id,
       kind: item.type === "Receita" ? "Entrada" : "Saída",
@@ -1578,7 +1632,7 @@ function renderStatement() {
         detail: `${item.card} · parcela ${index + 1}/${item.parts} · ${part.paid ? "Pago" : "Aberto"}`,
         value: Number(part.value || 0),
         tone: "card",
-        action: `<button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
+        action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
       }))),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
@@ -1591,16 +1645,41 @@ function renderStatement() {
       action: `<button class="tiny ghost" data-toggle-fixed="${item.id}">${isFixedPaid(item) ? "Marcar pendente" : "Marcar pago"}</button>`
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const query = statementSearch.trim().toLowerCase();
+  rows = rows.filter((item) => {
+    if (statementFilter !== "Todos" && item.kind !== statementFilter) return false;
+    if (!query) return true;
+    return [item.title, item.detail, item.kind, item.value].join(" ").toLowerCase().includes(query);
+  });
 
   qs("#statement").innerHTML = `
     <div class="panel helper-panel">
       <h2>Extrato do mês</h2>
       <p>Veja tudo que foi lançado em ${state.selectedMonth}: entradas, saídas, faturas e contas fixas. Se marcou algo errado, altere aqui.</p>
     </div>
+    <div class="statement-tools panel">
+      <label class="field">
+        <span>Buscar no extrato</span>
+        <input id="statement-search" type="search" value="${statementSearch}" placeholder="Ex: aluguel, Nubank, mercado">
+      </label>
+      <div class="mode-picker filter-tabs">
+        ${["Todos", "Entrada", "Saída", "Cartão", "Conta fixa"].map((filter) => `<button class="${statementFilter === filter ? "active" : ""}" type="button" data-statement-filter="${filter}">${filter}</button>`).join("")}
+      </div>
+    </div>
     <div class="statement-list panel">
       ${rows.length ? rows.map(statementRow).join("") : emptyHtml()}
     </div>
   `;
+  qs("#statement-search").addEventListener("input", (event) => {
+    statementSearch = event.target.value;
+    renderStatement();
+  });
+  document.querySelectorAll("[data-statement-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      statementFilter = button.dataset.statementFilter;
+      renderStatement();
+    });
+  });
 }
 
 function fixedDateForMonth(item) {
@@ -1777,7 +1856,7 @@ function renderCards() {
       `<td class="amount">${formatMoney(item.value)}</td>`,
       item.parts,
       item.firstMonth,
-      `<button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
+      `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
     ]))}
   `;
   qs("#card-form").addEventListener("submit", addInstallment);
@@ -1786,18 +1865,26 @@ function renderCards() {
 function cardInvoiceRow(card) {
   const totals = cardTotals(card.name);
   const monthItems = cardMonthItems(card.name);
+  const paidItems = monthItems.filter((item) => item.paid);
+  const openItems = monthItems.filter((item) => !item.paid);
+  const paidTotal = total(paidItems);
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   return `
     <div class="invoice-card">
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Atual ${formatMoney(totals.month)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+          <span>Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
         </div>
-        <button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>
+        ${openItems.length ? `<button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
       </div>
       <div class="invoice-items">
-        ${monthItems.length ? monthItems.map((item) => `<span>${item.description} · ${item.partLabel}<b>${formatMoney(item.value)}</b></span>`).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
+        ${monthItems.length ? monthItems.map((item) => `
+          <span class="${item.paid ? "paid" : "open"}">
+            ${item.description} · ${item.partLabel} · ${item.paid ? "Pago" : "Aberto"}
+            <b>${formatMoney(item.value)}</b>
+          </span>
+        `).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
       </div>
     </div>
   `;
@@ -1806,8 +1893,8 @@ function cardInvoiceRow(card) {
 function cardMonthItems(cardName) {
   return state.installments
     .filter((item) => item.card === cardName)
-    .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, description: item.description, partLabel: `${index + 1}/${item.parts}` })))
-    .filter((part) => part.month === state.selectedMonth && !part.paid);
+    .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
+    .filter((part) => part.month === state.selectedMonth);
 }
 
 function cardSummary(card) {
@@ -2076,6 +2163,31 @@ function addGoal(event) {
   commitState();
 }
 
+function renderMore() {
+  const summary = currentSummary();
+  const items = [
+    { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}` },
+    { view: "accounts", icon: "≋", title: "Nossa carteira", note: `${state.accounts.length} contas · organize saldo e cartões` },
+    { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}` },
+    { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal" },
+    { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar" }
+  ];
+  qs("#more").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Mais opções</h2>
+      <p>As telas menos usadas ficam aqui para o rodapé do celular não ficar apertado.</p>
+    </div>
+    <div class="more-grid">
+      ${items.map((item) => `
+        <button class="more-card" type="button" data-view="${item.view}">
+          <b>${item.icon}</b>
+          <span><strong>${item.title}</strong><small>${item.note}</small></span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderSettings() {
   const inviteCode = householdInviteCode || "";
   qs("#settings").innerHTML = `
@@ -2301,6 +2413,21 @@ function editCard(id) {
   renderModal();
 }
 
+function editInstallment(id) {
+  const item = state.installments.find((installment) => installment.id === id);
+  if (!item) return;
+  modalMode = { kind: "installment", id, fields: [
+    { name: "date", label: "Data da compra", type: "date", value: item.date },
+    { name: "card", label: "Cartão", value: item.card },
+    { name: "description", label: "Descrição", value: item.description },
+    { name: "category", label: "Categoria", value: item.category },
+    { name: "value", label: "Valor total", type: "number", step: "0.01", value: item.value },
+    { name: "parts", label: "Parcelas", type: "number", step: "1", value: item.parts },
+    { name: "firstMonth", label: "Primeiro mês", value: item.firstMonth }
+  ] };
+  renderModal();
+}
+
 function labelWithHelp(label, help = "") {
   return `${label}${help ? `<button class="help-dot" type="button" title="${help}" aria-label="${help}">?</button>` : ""}`;
 }
@@ -2403,6 +2530,7 @@ document.addEventListener("click", (event) => {
 
   if (event.target.dataset.editFixed) editFixedBill(event.target.dataset.editFixed);
   if (event.target.dataset.editCard) editCard(event.target.dataset.editCard);
+  if (event.target.dataset.editInstallment) editInstallment(event.target.dataset.editInstallment);
   if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
 
   if (event.target.dataset.editCategory) {
@@ -2470,6 +2598,31 @@ document.addEventListener("click", (event) => {
       return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] };
     });
     notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
+    commitState();
+  }
+
+  if (event.target.dataset.reopenCardMonth) {
+    const cardName = event.target.dataset.reopenCardMonth;
+    state.installments = state.installments.map((item) => {
+      if (item.card !== cardName) return item;
+      const schedule = getInstallmentSchedule(item);
+      if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
+      return { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth) };
+    });
+    notify("card", `Fatura reaberta: ${cardName} · ${state.selectedMonth}`);
+    commitState();
+  }
+
+  if (event.target.dataset.toggleCardPart) {
+    const [id, month] = event.target.dataset.toggleCardPart.split("|");
+    state.installments = state.installments.map((item) => {
+      if (item.id !== id) return item;
+      const paidMonths = new Set(item.paidMonths || []);
+      if (paidMonths.has(month)) paidMonths.delete(month);
+      else paidMonths.add(month);
+      return { ...item, paidMonths: [...paidMonths] };
+    });
+    notify("card", "Status da parcela atualizado");
     commitState();
   }
 });
