@@ -339,13 +339,14 @@ function renderCloudPanel(message = "") {
     return;
   }
 
+  const savedText = message || syncStatus || "Pronto para salvar";
   panel.innerHTML = `
+    <div class="top-status">
+      <span><i class="dot"></i> Online</span>
+      <small>${savedText}</small>
+    </div>
     <button class="notif-button" id="toggle-notifications" type="button" title="Notificações">🔔${unreadCount() ? `<b>${unreadCount()}</b>` : ""}</button>
     <button class="notif-button" id="toggle-privacy" type="button" title="Ocultar valores">${state.privacyMode ? "🙈" : "👁"}</button>
-    <span class="mini-status"><i class="dot"></i> Online</span>
-    ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
-    <button class="ghost" id="logout" type="button">Sair</button>
-    ${message ? `<span class="mini-status">${message}</span>` : ""}
   `;
   qs("#toggle-notifications").addEventListener("click", () => {
     notificationsOpen = !notificationsOpen;
@@ -355,7 +356,6 @@ function renderCloudPanel(message = "") {
     state.privacyMode = !state.privacyMode;
     commitState();
   });
-  qs("#logout").addEventListener("click", signOut);
   renderNotifications();
 }
 
@@ -1861,6 +1861,7 @@ function renderSettings() {
             ${inviteCodeVisible ? `<button class="ghost" id="copy-invite" type="button">Copiar código</button>` : ""}
           ` : ""}
           <button class="ghost" id="join-by-code" type="button">Entrar com código de outro cofre</button>
+          <button class="ghost" id="logout" type="button">Sair da conta</button>
           <button class="danger" id="reset-data" type="button">Reiniciar controle do zero</button>
         </div>
       </div>
@@ -1880,6 +1881,7 @@ function renderSettings() {
   const copyInvite = qs("#copy-invite");
   if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
   qs("#join-by-code").addEventListener("click", promptJoinHousehold);
+  qs("#logout").addEventListener("click", signOut);
   qs("#reset-data").addEventListener("click", resetData);
 }
 
