@@ -2515,3 +2515,69 @@ td.amount {
     padding: 22px;
   }
 }
+
+@media (max-width: 720px) {
+  body.app-ready .statement-list.panel,
+  body.app-ready .notifications-panel {
+    color: #f2fff9;
+    background: rgba(6, 27, 27, .98);
+    border-color: rgba(183, 255, 238, .22);
+  }
+
+  body.app-ready .notifications-head {
+    color: #f2fff9;
+    background: #061313;
+    border-bottom-color: rgba(183, 255, 238, .18);
+  }
+
+  body.app-ready .notifications-list {
+    background: #071b1b;
+  }
+
+  body.app-ready .statement-item,
+  body.app-ready .notification-item,
+  body.app-ready .notification-item.unread {
+    color: #f2fff9;
+    background: rgba(9, 45, 43, .96);
+    border-color: rgba(183, 255, 238, .20);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .22);
+  }
+
+  body.app-ready .notification-item.unread {
+    background: rgba(0, 191, 122, .18);
+    border-color: rgba(0, 224, 154, .40);
+  }
+
+  body.app-ready .statement-item strong,
+  body.app-ready .statement-item b,
+  body.app-ready .notification-item strong {
+    color: #f2fff9;
+  }
+
+  body.app-ready .statement-item span,
+  body.app-ready .notification-item small {
+    color: #b9d7d1;
+  }
+
+  body.app-ready .statement-icon,
+  body.app-ready .notification-item > span {
+    color: #061b1b;
+    background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  }
+
+  body.app-ready .statement-item .income {
+    color: #00e09a;
+  }
+
+  body.app-ready .statement-item .expense {
+    color: #ff7a70;
+  }
+
+  body.app-ready .empty strong {
+    color: #f2fff9;
+  }
+
+  body.app-ready .empty span {
+    color: #b9d7d1;
+  }
+}
