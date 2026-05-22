@@ -43,6 +43,7 @@ let editingEntryId = null;
 let tutorialStep = 0;
 let inviteCodeVisible = false;
 let entryFilter = "Todos";
+let confirmAction = null;
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
@@ -160,6 +161,7 @@ function pageTitle(view) {
     entries: "Lançamentos",
     statement: "Extrato",
     fixed: "Contas Fixas",
+    agenda: "Agenda",
     cards: "Cartões",
     accounts: "Nossa Carteira",
     method: "Método 50/30/20",
@@ -182,6 +184,7 @@ function render() {
   renderEntries();
   renderStatement();
   renderFixedBills();
+  renderAgenda();
   renderCards();
   renderAccounts();
   renderMethod();
@@ -503,6 +506,34 @@ function renderModal() {
   const modal = qs("#app-modal");
   if (!modalMode) return closeModal();
   modal.classList.add("open");
+  if (typeof modalMode === "object") {
+    modal.innerHTML = editModalHtml(modalMode);
+    qs("#close-modal").addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal();
+    }, { once: true });
+    const form = qs("#edit-modal-form");
+    if (form) form.addEventListener("submit", saveEditModal);
+    return;
+  }
+  if (modalMode === "confirm") {
+    modal.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-head"><strong>Confirmar ação</strong><button class="ghost tiny" id="close-modal" type="button">Fechar</button></div>
+        <div class="tutorial-body"><p>Tem certeza que deseja continuar?</p></div>
+        <div class="tutorial-actions"><button class="ghost" id="cancel-confirm" type="button">Cancelar</button><button class="danger" id="accept-confirm" type="button">Confirmar</button></div>
+      </div>
+    `;
+    qs("#close-modal").addEventListener("click", closeModal);
+    qs("#cancel-confirm").addEventListener("click", closeModal);
+    qs("#accept-confirm").addEventListener("click", () => {
+      const action = confirmAction;
+      confirmAction = null;
+      closeModal();
+      if (action) action();
+    });
+    return;
+  }
   modal.innerHTML = `
     <div class="modal-card">
       <div class="modal-head">
@@ -523,6 +554,79 @@ function renderModal() {
     if (event.target === modal) closeModal();
   }, { once: true });
   qs("#quick-form").addEventListener("submit", saveQuickEntry);
+}
+
+function editModalHtml(config) {
+  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
+  const fields = config.fields.map((field) => input(field.name, field.label, field.type || "text", field.value ?? "", field.step || "")).join("");
+  return `
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>${title}</strong>
+        <button class="ghost tiny" id="close-modal" type="button">Fechar</button>
+      </div>
+      <form class="auth-actions" id="edit-modal-form">
+        <input type="hidden" name="kind" value="${config.kind}">
+        <input type="hidden" name="id" value="${config.id}">
+        ${config.extra ? Object.entries(config.extra).map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`).join("") : ""}
+        ${fields}
+        <button class="primary" type="submit">Salvar alteração</button>
+      </form>
+    </div>
+  `;
+}
+
+function saveEditModal(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  if (data.kind === "fixed") {
+    const item = state.fixedBills.find((bill) => bill.id === data.id);
+    if (item) Object.assign(item, { name: data.name, value: Number(data.value || 0), dueDay: Number(data.dueDay || 1) });
+  }
+  if (data.kind === "account") {
+    const item = state.accounts.find((account) => account.id === data.id);
+    if (item) {
+      const oldName = item.name;
+      item.name = data.name;
+      item.initial = Number(data.initial || 0);
+      state.entries = state.entries.map((entry) => entry.account === oldName ? { ...entry, account: item.name } : entry);
+    }
+  }
+  if (data.kind === "card") {
+    const item = state.cards.find((card) => card.id === data.id);
+    if (item) {
+      const oldName = item.name;
+      item.name = data.name;
+      item.limit = Number(data.limit || 0);
+      state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
+    }
+  }
+  if (data.kind === "goal") {
+    const item = state.goals.find((goal) => goal.id === data.id);
+    if (item) Object.assign(item, { title: data.title, target: Number(data.target || 0), saved: Number(data.saved || 0), due: data.due, status: data.status || item.status });
+  }
+  if (data.kind === "goalAdd") {
+    const item = state.goals.find((goal) => goal.id === data.id);
+    if (item) {
+      item.saved = Number(item.saved || 0) + Number(data.value || 0);
+      if (item.saved >= Number(item.target || 0)) item.status = "Concluído";
+    }
+  }
+  if (data.kind === "category") {
+    const key = data.categoryKind === "Receita" ? "categoriesIncome" : "categoriesExpense";
+    state[key] = state[key].map((item) => item === data.oldName ? data.name : item);
+    state.entries = state.entries.map((item) => item.category === data.oldName ? { ...item, category: data.name } : item);
+    state.installments = state.installments.map((item) => item.category === data.oldName ? { ...item, category: data.name } : item);
+  }
+  notify("sync", "Alteração salva");
+  closeModal();
+  commitState();
+}
+
+function askConfirm(action) {
+  confirmAction = action;
+  modalMode = "confirm";
+  renderModal();
 }
 
 function saveQuickEntry(event) {
@@ -861,6 +965,8 @@ function renderMonthFilter() {
 
 function renderDashboard() {
   const summary = currentSummary();
+  const forecast = monthForecast(summary);
+  const report = monthlyReport();
   const insights = dashboardInsights(summary);
   const fixedAlerts = fixedBillsWithDueInfo()
     .filter((item) => !isFixedPaid(item) && item.priority !== "normal")
@@ -910,11 +1016,17 @@ function renderDashboard() {
       </div>
       <div class="quick-actions">
         <button class="action-chip" data-view="entries"><b>＋</b><span>Lançamento</span></button>
+        <button class="action-chip" data-view="statement"><b>☷</b><span>Extrato</span></button>
+        <button class="action-chip" data-view="agenda"><b>◌</b><span>Agenda</span></button>
         <button class="action-chip" data-view="cards"><b>▣</b><span>Cartão</span></button>
-        <button class="action-chip" data-view="goals"><b>◇</b><span>Meta</span></button>
-        <button class="action-chip" data-view="accounts"><b>≋</b><span>Nossa Carteira</span></button>
       </div>
     </section>
+    <div class="summary-grid bank-metrics compact-dashboard">
+      ${metric("Saldo previsto", forecast.afterAll, forecast.afterAll >= 0 ? "good" : "bad")}
+      ${metric("Próxima conta", forecast.nextBill?.value || 0, forecast.nextBill ? "warn" : "good")}
+      ${metric("Fatura atual", summary.cardMonth, "info")}
+      ${metric("Meta guardada", summary.goalsSaved, "good")}
+    </div>
     <div class="summary-grid bank-metrics">
       ${metric("Renda total", summary.salaryTotal + summary.income, "good")}
       ${metric("Entradas extras", summary.income, "good")}
@@ -923,6 +1035,24 @@ function renderDashboard() {
       ${metric("Fixas pagas", summary.fixedPaid, "good")}
       ${metric("Fixas pendentes", summary.fixedPending, "warn")}
       ${metric("Guardado em metas", summary.goalsSaved, "info")}
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Previsão do mês</h2>
+        <div class="list">
+          <div class="list-item"><div><strong>Saldo atual</strong><span>Receitas, gastos pagos e fatura aberta</span></div><b>${formatMoney(summary.balance)}</b></div>
+          <div class="list-item"><div><strong>Contas pendentes</strong><span>Ainda falta pagar neste mês</span></div><b>${formatMoney(summary.fixedPending)}</b></div>
+          <div class="list-item"><div><strong>Depois de pagar tudo</strong><span>Saldo previsto do mês</span></div><b>${formatMoney(forecast.afterAll)}</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Comparativo mensal</h2>
+        <div class="list">
+          <div class="list-item"><div><strong>Gastos vs mês anterior</strong><span>${report.expenseText}</span></div><b>${formatMoney(report.expenseDiff)}</b></div>
+          <div class="list-item"><div><strong>Entradas vs mês anterior</strong><span>${report.incomeText}</span></div><b>${formatMoney(report.incomeDiff)}</b></div>
+          <div class="list-item"><div><strong>Categoria que mais pesa</strong><span>${report.topCategory || "Sem categoria"}</span></div><b>${formatMoney(report.topCategoryValue)}</b></div>
+        </div>
+      </div>
     </div>
     <div class="grid-2">
       <div class="panel">
@@ -1016,6 +1146,39 @@ function budgetWarnings(includeAll = false) {
     const spent = total(monthExpenses.filter((item) => item.category === category));
     return { category, limit, spent, percent: Math.round((spent / Math.max(1, limit)) * 100) };
   }).filter((item) => item.limit > 0 && (includeAll || item.percent >= 80));
+}
+
+function monthForecast(summary = currentSummary()) {
+  const nextBill = fixedBillsWithDueInfo().find((item) => !isFixedPaid(item)) || null;
+  return {
+    nextBill,
+    afterAll: summary.balance - summary.fixedPending
+  };
+}
+
+function monthlyReport() {
+  const current = state.selectedMonth;
+  const previous = months[(monthIndex(current) + 11) % 12];
+  const currentEntries = byMonth(state.entries, current);
+  const previousEntries = byMonth(state.entries, previous);
+  const currentExpense = total(currentEntries.filter((item) => item.type === "Despesa"));
+  const previousExpense = total(previousEntries.filter((item) => item.type === "Despesa"));
+  const currentIncome = total(currentEntries.filter((item) => item.type === "Receita"));
+  const previousIncome = total(previousEntries.filter((item) => item.type === "Receita"));
+  const categoryTotals = currentEntries
+    .filter((item) => item.type === "Despesa")
+    .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
+  const top = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ["", 0];
+  const expenseDiff = currentExpense - previousExpense;
+  const incomeDiff = currentIncome - previousIncome;
+  return {
+    expenseDiff,
+    incomeDiff,
+    expenseText: expenseDiff > 0 ? "Gastou mais que no mês anterior" : expenseDiff < 0 ? "Gastou menos que no mês anterior" : "Mesmo nível do mês anterior",
+    incomeText: incomeDiff > 0 ? "Entrou mais dinheiro" : incomeDiff < 0 ? "Entrou menos dinheiro" : "Mesma renda lançada",
+    topCategory: top[0],
+    topCategoryValue: top[1]
+  };
 }
 
 function fixedBillsWithDueInfo() {
@@ -1167,6 +1330,7 @@ function renderOnboarding() {
       ${onboardingStep(state.accounts.length, "Adicionar carteira", "accounts", "Cadastre onde o dinheiro fica: banco, dinheiro em casa ou conta digital.")}
       ${onboardingStep(state.cards.length, "Cadastrar cartão", "accounts", "Inclua o cartão e limite para acompanhar fatura e compras parceladas.")}
       ${onboardingStep(state.fixedBills.length, "Contas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
+      ${onboardingStep(state.fixedBills.length || state.goals.length, "Conferir agenda", "agenda", "Veja contas vencendo, faturas abertas e metas com data.")}
       ${onboardingStep(state.entries.length || state.installments.length, "Primeiro lançamento", "entries", "Registre uma entrada ou saída para começar o histórico do mês.")}
       ${onboardingStep(state.entries.length || state.installments.length, "Ver extrato", "statement", "Acompanhe tudo que já foi lançado, inclusive pagos e pendentes.")}
       ${onboardingStep(householdInviteCode, "Convidar parceiro", "settings", "Mostre o código em Configurações da conta e envie para seu parceiro.")}
@@ -1481,6 +1645,55 @@ function renderFixedBills() {
   qs("#fixed-form").addEventListener("submit", addFixedBill);
 }
 
+function renderAgenda() {
+  const fixedItems = fixedBillsWithDueInfo().map((item) => ({
+    type: "Conta fixa",
+    title: item.name,
+    date: item.dueDate,
+    detail: `${item.dueText} · ${isFixedPaid(item) ? "Pago" : "Pendente"}`,
+    value: item.value,
+    priority: item.priority
+  }));
+  const cardItems = state.cards.map((card) => {
+    const totals = cardTotals(card.name);
+    return {
+      type: "Fatura",
+      title: card.name,
+      date: new Date(new Date().getFullYear(), monthIndex(state.selectedMonth), 28),
+      detail: `Fatura aberta em ${state.selectedMonth}`,
+      value: totals.month,
+      priority: totals.month > 0 ? "soon" : "normal"
+    };
+  }).filter((item) => item.value > 0);
+  const goalItems = state.goals.filter((goal) => goal.due).map((goal) => ({
+    type: "Meta",
+    title: goal.title,
+    date: new Date(`${goal.due}T00:00:00Z`),
+    detail: `${goal.status} · falta ${formatMoney(Math.max(0, Number(goal.target || 0) - Number(goal.saved || 0)))}`,
+    value: goal.saved,
+    priority: "normal"
+  }));
+  const items = [...fixedItems, ...cardItems, ...goalItems].sort((a, b) => a.date - b.date);
+  qs("#agenda").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Agenda financeira</h2>
+      <p>Uma linha do tempo com contas, faturas e metas para vocês não perderem vencimentos.</p>
+    </div>
+    <div class="panel agenda-list">
+      ${items.length ? items.map(agendaItem).join("") : emptyHtml()}
+    </div>
+  `;
+}
+
+function agendaItem(item) {
+  return `
+    <div class="list-item due-item ${item.priority}">
+      <div><strong>${item.title}</strong><span>${item.type} · ${dateFmt.format(item.date)} · ${item.detail}</span></div>
+      <b>${formatMoney(item.value)}</b>
+    </div>
+  `;
+}
+
 function fixedBillCard(item) {
   const paid = isFixedPaid(item);
   const info = fixedBillsWithDueInfo().find((bill) => bill.id === item.id) || item;
@@ -1524,17 +1737,12 @@ function addFixedBill(event) {
 function editFixedBill(id) {
   const item = state.fixedBills.find((bill) => bill.id === id);
   if (!item) return;
-  const name = prompt("Nome da conta fixa:", item.name);
-  if (name === null) return;
-  const value = prompt("Valor mensal:", item.value);
-  if (value === null) return;
-  const dueDay = prompt("Dia do vencimento:", item.dueDay);
-  if (dueDay === null) return;
-  item.name = name || item.name;
-  item.value = Number(value || 0);
-  item.dueDay = Number(dueDay || 1);
-  notify("sync", `Conta fixa editada: ${item.name}`);
-  commitState();
+  modalMode = { kind: "fixed", id, fields: [
+    { name: "name", label: "Nome", value: item.name },
+    { name: "value", label: "Valor", type: "number", step: "0.01", value: item.value },
+    { name: "dueDay", label: "Vencimento", type: "number", step: "1", value: item.dueDay }
+  ] };
+  renderModal();
 }
 
 function renderCards() {
@@ -1751,16 +1959,11 @@ function addAccount(event) {
 function editAccount(id) {
   const item = state.accounts.find((account) => account.id === id);
   if (!item) return;
-  const oldName = item.name;
-  const name = prompt("Nome da carteira:", item.name);
-  if (name === null) return;
-  const initial = prompt("Saldo inicial:", item.initial);
-  if (initial === null) return;
-  item.name = name || item.name;
-  state.entries = state.entries.map((entry) => entry.account === oldName ? { ...entry, account: item.name } : entry);
-  item.initial = Number(initial || 0);
-  notify("account", `Carteira editada: ${item.name}`);
-  commitState();
+  modalMode = { kind: "account", id, fields: [
+    { name: "name", label: "Nome", value: item.name },
+    { name: "initial", label: "Saldo inicial", type: "number", step: "0.01", value: item.initial }
+  ] };
+  renderModal();
 }
 
 function addIncome(event) {
@@ -1859,7 +2062,7 @@ function goalCard(goal) {
     <div class="progress-meta"><span>Falta ${formatMoney(missing)} · ${goal.due ? dateFmt.format(new Date(`${goal.due}T00:00:00Z`)) : "Sem data"}</span>${pill(goal.status, goal.status === "Concluído" ? "done" : "")}</div>
     <div class="card-actions">
       <button class="tiny ghost" data-add-goal="${goal.id}">Adicionar guardado</button>
-      <button class="tiny ghost" data-edit-goal="${goal.id}">Editar valores</button>
+      <button class="tiny ghost" data-edit-goal="${goal.id}">Editar</button>
       <button class="tiny danger" data-delete-goal="${goal.id}">Excluir</button>
     </div>
   </article>`;
@@ -1878,6 +2081,10 @@ function renderSettings() {
   qs("#settings").innerHTML = `
     <form class="settings-form" id="profile-form">
       <div class="span-3"><h2>Perfil do casal</h2></div>
+      <div class="profile-preview span-3">
+        ${personAvatar(state.profile.personOne || "Ele", "one")}
+        ${personAvatar(state.profile.personTwo || "Ela", "two")}
+      </div>
       ${input("personOne", "Primeira pessoa", "text", state.profile.personOne || "Ele", "", "Nome que aparece nos lançamentos e relatórios.")}
       ${input("salaryOne", "Salário da primeira pessoa", "number", state.profile.salaryOne || 0, "0.01", "Renda mensal usada no dashboard e no 50/30/20.")}
       ${input("personTwo", "Segunda pessoa", "text", state.profile.personTwo || "Ela", "", "Nome que aparece nos lançamentos e relatórios.")}
@@ -1887,11 +2094,11 @@ function renderSettings() {
     <div class="grid-2">
       <div class="panel">
         <h2>Categorias de receitas</h2>
-        <div class="list">${state.categoriesIncome.map((item) => `<div class="list-item"><strong>${item}</strong></div>`).join("")}</div>
+        <div class="list">${state.categoriesIncome.map((item) => categoryRow(item, "Receita")).join("")}</div>
       </div>
       <div class="panel">
         <h2>Categorias de despesas</h2>
-        <div class="list">${state.categoriesExpense.map((item) => `<div class="list-item"><strong>${item}</strong></div>`).join("")}</div>
+        <div class="list">${state.categoriesExpense.map((item) => categoryRow(item, "Despesa")).join("")}</div>
       </div>
     </div>
     <div class="settings-stack">
@@ -1930,6 +2137,13 @@ function renderSettings() {
           <label class="field"><span>Importar backup</span><input id="import-data" type="file" accept="application/json"></label>
         </div>
       </div>
+      <div class="panel">
+        <h2>Instalar como app</h2>
+        <div class="list">
+          <div class="list-item"><div><strong>iPhone</strong><span>Abra no Safari, toque em Compartilhar e depois Adicionar à Tela de Início.</span></div></div>
+          <div class="list-item"><div><strong>Android</strong><span>Abra no Chrome e toque em Instalar app ou Adicionar à tela inicial.</span></div></div>
+        </div>
+      </div>
       <div class="panel danger-zone">
         <h2>Configurações da conta</h2>
         <div class="list">
@@ -1963,6 +2177,22 @@ function renderSettings() {
   qs("#join-by-code").addEventListener("click", promptJoinHousehold);
   qs("#logout").addEventListener("click", signOut);
   qs("#reset-data").addEventListener("click", resetData);
+}
+
+function personAvatar(name, tone) {
+  return `<div class="person-avatar ${tone}"><b>${String(name || "?").slice(0, 1).toUpperCase()}</b><span>${name}</span></div>`;
+}
+
+function categoryRow(item, kind) {
+  return `
+    <div class="list-item">
+      <strong>${item}</strong>
+      <span>
+        <button class="tiny ghost" data-edit-category="${kind}|${item}">Editar</button>
+        <button class="tiny danger" data-delete-category="${kind}|${item}">Excluir</button>
+      </span>
+    </div>
+  `;
 }
 
 function budgetRowsHtml() {
@@ -2023,11 +2253,12 @@ function importData(event) {
 }
 
 function resetData() {
-  if (!confirm("Tem certeza que deseja reiniciar o controle do zero?")) return;
-  state = blankState();
-  notify("sync", "Controle reiniciado do zero");
-  localStorage.removeItem("coupleFinanceApp");
-  commitState();
+  askConfirm(() => {
+    state = blankState();
+    notify("sync", "Controle reiniciado do zero");
+    localStorage.removeItem("coupleFinanceApp");
+    commitState();
+  });
 }
 
 function saveProfile(event) {
@@ -2063,16 +2294,11 @@ function addCard(event) {
 function editCard(id) {
   const item = state.cards.find((card) => card.id === id);
   if (!item) return;
-  const oldName = item.name;
-  const name = prompt("Nome do cartão:", item.name);
-  if (name === null) return;
-  const limit = prompt("Limite total:", item.limit);
-  if (limit === null) return;
-  item.name = name || item.name;
-  state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
-  item.limit = Number(limit || 0);
-  notify("card", `Cartão editado: ${item.name}`);
-  commitState();
+  modalMode = { kind: "card", id, fields: [
+    { name: "name", label: "Nome", value: item.name },
+    { name: "limit", label: "Limite", type: "number", step: "0.01", value: item.limit }
+  ] };
+  renderModal();
 }
 
 function labelWithHelp(label, help = "") {
@@ -2149,10 +2375,11 @@ document.addEventListener("click", (event) => {
   ];
   for (const [datasetKey, stateKey] of deleteMap) {
     if (event.target.dataset[datasetKey]) {
-      if (!confirm("Tem certeza que deseja excluir este item?")) return;
-      state[stateKey] = state[stateKey].filter((item) => item.id !== event.target.dataset[datasetKey]);
-      notify("sync", "Item removido");
-      commitState();
+      askConfirm(() => {
+        state[stateKey] = state[stateKey].filter((item) => item.id !== event.target.dataset[datasetKey]);
+        notify("sync", "Item removido");
+        commitState();
+      });
     }
   }
 
@@ -2178,28 +2405,44 @@ document.addEventListener("click", (event) => {
   if (event.target.dataset.editCard) editCard(event.target.dataset.editCard);
   if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
 
+  if (event.target.dataset.editCategory) {
+    const [kind, oldName] = event.target.dataset.editCategory.split("|");
+    modalMode = { kind: "category", id: oldName, extra: { categoryKind: kind, oldName }, fields: [
+      { name: "name", label: "Nome da categoria", value: oldName }
+    ] };
+    renderModal();
+  }
+
+  if (event.target.dataset.deleteCategory) {
+    const [kind, oldName] = event.target.dataset.deleteCategory.split("|");
+    askConfirm(() => {
+      const key = kind === "Receita" ? "categoriesIncome" : "categoriesExpense";
+      state[key] = state[key].filter((item) => item !== oldName);
+      notify("sync", `Categoria removida: ${oldName}`);
+      commitState();
+    });
+  }
+
   if (event.target.dataset.addGoal) {
     const goal = state.goals.find((item) => item.id === event.target.dataset.addGoal);
     if (!goal) return;
-    const value = Number(prompt("Quanto você quer adicionar ao valor guardado?", "0") || 0);
-    if (!value) return;
-    goal.saved = Number(goal.saved || 0) + value;
-    if (goal.saved >= Number(goal.target || 0)) goal.status = "Concluído";
-    notify("goal", `Meta atualizada: ${goal.title}`);
-    commitState();
+    modalMode = { kind: "goalAdd", id: goal.id, fields: [
+      { name: "value", label: "Valor para adicionar", type: "number", step: "0.01", value: 0 }
+    ] };
+    renderModal();
   }
 
   if (event.target.dataset.editGoal) {
     const goal = state.goals.find((item) => item.id === event.target.dataset.editGoal);
     if (!goal) return;
-    const target = prompt("Qual é o valor total da meta?", goal.target);
-    const saved = prompt("Quanto já está guardado?", goal.saved);
-    if (target === null || saved === null) return;
-    goal.target = Number(target || 0);
-    goal.saved = Number(saved || 0);
-    goal.status = goal.saved >= goal.target && goal.target > 0 ? "Concluído" : "Em progresso";
-    notify("goal", `Valores da meta editados: ${goal.title}`);
-    commitState();
+    modalMode = { kind: "goal", id: goal.id, fields: [
+      { name: "title", label: "Nome", value: goal.title },
+      { name: "target", label: "Valor total", type: "number", step: "0.01", value: goal.target },
+      { name: "saved", label: "Valor guardado", type: "number", step: "0.01", value: goal.saved },
+      { name: "due", label: "Data-alvo", type: "date", value: goal.due || "" },
+      { name: "status", label: "Status", value: goal.status }
+    ] };
+    renderModal();
   }
 
   const help = event.target.closest(".help-dot");
