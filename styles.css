@@ -1789,6 +1789,18 @@ td.amount {
   transition: border-color .18s ease, transform .18s ease;
 }
 
+button.list-item {
+  width: 100%;
+  align-items: center;
+  color: var(--ink);
+  text-align: left;
+}
+
+.dashboard-action.good { border-left: 5px solid var(--green); }
+.dashboard-action.info { border-left: 5px solid var(--blue); }
+.dashboard-action.warn { border-left: 5px solid var(--gold); }
+.dashboard-action.bad { border-left: 5px solid var(--red); }
+
 .list-item:hover {
   border-color: rgba(0, 168, 107, .38);
   transform: translateX(2px);
@@ -2677,6 +2689,7 @@ td.amount {
   }
 
   body.app-ready .statement-item,
+  body.app-ready button.list-item,
   body.app-ready .notification-item,
   body.app-ready .notification-item.unread {
     color: #f2fff9;
