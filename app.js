@@ -12,10 +12,11 @@ const seed = {
   cards: [],
   entries: [],
   installments: [],
+  fixedBills: [],
   methodIncome: 0,
   goals: [],
   notifications: [],
-  profile: { personOne: "Ele", personTwo: "Ela" },
+  profile: { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 },
   onboardingDone: false,
   tutorialDone: false,
   privacyMode: false,
@@ -42,13 +43,14 @@ let editingEntryId = null;
 let tutorialStep = 0;
 
 const tutorialSteps = [
-  ["Visão geral", "Veja saldo do mês, entradas, saídas, faturas, alertas e o resumo inteligente."],
-  ["Lançamentos", "Registre entradas, saídas e compras no cartão. Use o botão + para lançar rápido."],
+  ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
+  ["Lançamentos", "Registre somente entradas e saídas feitas na hora. Compras no cartão ficam na aba Cartões."],
+  ["Contas Fixas", "Cadastre aluguel, internet, energia e dívidas mensais. Marque como pago quando sair o dinheiro."],
   ["Nossa Carteira", "Cadastre contas, cartões e rendas como salário. É a base do controle."],
-  ["Cartões", "Acompanhe compras parceladas, fatura atual e próxima fatura."],
+  ["Cartões", "Lance compras parceladas e acompanhe fatura atual, próxima fatura e limite usado."],
   ["50/30/20", "Planeje renda entre essenciais, investimentos e desejos."],
-  ["Metas", "Acompanhe objetivos do casal, como carro, viagem ou reserva."],
-  ["Cadastros", "Ajuste nomes, categorias, recorrências, orçamento e backup."]
+  ["Metas", "Acompanhe objetivos do casal e edite valor guardado ou valor total quando precisar."],
+  ["Cadastros", "Ajuste nomes, salários, categorias, recorrências, orçamento e backup."]
 ];
 
 const qs = (selector, root = document) => root.querySelector(selector);
@@ -72,8 +74,12 @@ function ensureStateShape() {
   state.cards ||= [];
   state.entries ||= [];
   state.installments ||= [];
+  state.installments = state.installments.map((item) => ({ ...item, paidMonths: item.paidMonths || [] }));
+  state.fixedBills ||= [];
   state.goals ||= [];
-  state.profile ||= { personOne: "Ele", personTwo: "Ela" };
+  state.profile ||= { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 };
+  state.profile.salaryOne ||= 0;
+  state.profile.salaryTwo ||= 0;
   state.recurring ||= [];
   state.budgets ||= {};
   if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
@@ -133,13 +139,18 @@ function currentSummary() {
   const expense = total(entries.filter((item) => item.type === "Despesa"));
   const cardMonth = total(state.cards.map((card) => ({ value: cardTotals(card.name).month })));
   const cardDebt = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
-  return { income, expense, cardMonth, cardDebt, balance: income - expense - cardMonth };
+  const fixedPaid = total((state.fixedBills || []).filter((item) => item.status === "Pago"));
+  const fixedPending = total((state.fixedBills || []).filter((item) => item.status !== "Pago"));
+  const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+  const goalsSaved = total((state.goals || []).map((goal) => ({ value: goal.saved })));
+  return { income, expense, cardMonth, cardDebt, fixedPaid, fixedPending, salaryTotal, goalsSaved, balance: income + salaryTotal - expense - fixedPaid - cardMonth };
 }
 
 function pageTitle(view) {
   return {
     dashboard: "Visão geral",
     entries: "Lançamentos",
+    fixed: "Contas Fixas",
     cards: "Cartões",
     accounts: "Nossa Carteira",
     method: "Método 50/30/20",
@@ -158,6 +169,7 @@ function render() {
   renderDashboard();
   renderOnboarding();
   renderEntries();
+  renderFixedBills();
   renderCards();
   renderAccounts();
   renderMethod();
@@ -278,6 +290,10 @@ function renderGate(message = "") {
         ` : `
           <h1>Preparando sua conta</h1>
           <p>Estamos criando seu espaço financeiro vazio para você começar do zero.</p>
+          <form class="auth-actions" id="manual-invite-form">
+            <label class="field"><span>Código de convite</span><input name="code" placeholder="CASAL-ABC123"></label>
+            <button class="ghost" type="submit">Entrar com código</button>
+          </form>
         `}
         ${message ? `<p class="mini-status">${message}</p>` : ""}
       </div>
@@ -286,6 +302,11 @@ function renderGate(message = "") {
     if (logout) logout.addEventListener("click", signOut);
     const accept = qs("#accept-invite");
     if (accept) accept.addEventListener("click", () => joinHousehold(invite));
+    const manualInvite = qs("#manual-invite-form");
+    if (manualInvite) manualInvite.addEventListener("submit", (event) => {
+      event.preventDefault();
+      joinHousehold(new FormData(event.target).get("code"));
+    });
     return;
   }
 
@@ -448,7 +469,7 @@ function renderModal() {
         <button class="ghost tiny" id="close-modal" type="button">Fechar</button>
       </div>
       <form class="auth-actions" id="quick-form">
-        ${select("type", "Tipo", ["Saída", "Entrada", "Cartão"])}
+        ${select("type", "Tipo", ["Saída", "Entrada"])}
         ${input("value", "Valor", "number", "", "0.01")}
         ${input("description", "Descrição", "text", "")}
         ${select("person", "Quem?", appPeople())}
@@ -466,38 +487,23 @@ function renderModal() {
 function saveQuickEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  const type = data.type === "Entrada" ? "Receita" : data.type === "Cartão" ? "Cartão" : "Despesa";
+  const type = data.type === "Entrada" ? "Receita" : "Despesa";
   const today = new Date().toISOString().slice(0, 10);
-  if (type === "Cartão") {
-    state.installments.unshift({
-      id: crypto.randomUUID(),
-      date: today,
-      card: state.cards[0]?.name || "Cartão",
-      description: data.description || "Compra no cartão",
-      category: state.categoriesExpense[0] || "Cartão",
-      value: Number(data.value || 0),
-      parts: 1,
-      firstMonth: months[new Date().getMonth()],
-      paidMonths: []
-    });
-    notify("card", `Compra rápida no cartão · ${formatMoney(Number(data.value || 0))}`);
-  } else {
-    state.entries.unshift({
-      id: crypto.randomUUID(),
-      date: today,
-      month: months[new Date().getMonth()],
-      type,
-      category: type === "Receita" ? state.categoriesIncome[0] : state.categoriesExpense[0],
-      description: data.description || (type === "Receita" ? "Entrada rápida" : "Saída rápida"),
-      value: Number(data.value || 0),
-      person: data.person,
-      payment: type === "Receita" ? "Recebimento" : "Pix",
-      account: accountOptions()[0],
-      status: "Pago",
-      notes: ""
-    });
-    notify("entry", `${data.type} rápida · ${formatMoney(Number(data.value || 0))}`);
-  }
+  state.entries.unshift({
+    id: crypto.randomUUID(),
+    date: today,
+    month: months[new Date().getMonth()],
+    type,
+    category: type === "Receita" ? state.categoriesIncome[0] : state.categoriesExpense[0],
+    description: data.description || (type === "Receita" ? "Entrada rápida" : "Saída rápida"),
+    value: Number(data.value || 0),
+    person: data.person,
+    payment: type === "Receita" ? "Recebimento" : "Pix",
+    account: accountOptions()[0],
+    status: "Pago",
+    notes: ""
+  });
+  notify("entry", `${data.type} rápida · ${formatMoney(Number(data.value || 0))}`);
   closeModal();
   commitState();
 }
@@ -795,10 +801,10 @@ function renderMonthFilter() {
 function renderDashboard() {
   const summary = currentSummary();
   const insights = dashboardInsights(summary);
-  const pending = state.entries
-    .filter((item) => item.status === "Pendente")
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 5);
+  const pending = [
+    ...state.entries.filter((item) => item.status === "Pendente"),
+    ...(state.fixedBills || []).filter((item) => item.status !== "Pago").map(fixedToPendingEntry)
+  ].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   const budgetAlerts = budgetWarnings();
   const attentionHtml = [
     ...budgetAlerts.map((item) => `<div class="list-item"><div><strong>${item.category}</strong><span>${item.percent}% do orçamento usado</span></div><b>${formatMoney(item.spent)} / ${formatMoney(item.limit)}</b></div>`),
@@ -811,6 +817,11 @@ function renderDashboard() {
     .filter((item) => item.type === "Despesa")
     .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
   const maxCategory = Math.max(1, ...Object.values(categoryTotals));
+  const upcomingFixed = [...(state.fixedBills || [])]
+    .filter((item) => item.status !== "Pago")
+    .sort((a, b) => Number(a.dueDay || 31) - Number(b.dueDay || 31))
+    .slice(0, 5);
+  const mood = dashboardMood(summary.balance, summary.salaryTotal);
   const people = appPeople().map((name) => {
     const personEntries = byMonth(state.entries).filter((item) => item.person === name);
     const income = total(personEntries.filter((item) => item.type === "Receita"));
@@ -825,10 +836,11 @@ function renderDashboard() {
           <span>Saldo do mês</span>
           <strong>${formatMoney(summary.balance)}</strong>
           <small>${state.selectedMonth} · Conta compartilhada</small>
+          <p class="mood-message">${mood.message}</p>
         </div>
-        ${coupleIllustration(summary.balance)}
+        ${coupleIllustration(mood)}
         <div class="balance-ring">
-          <span>${summary.balance >= 0 ? "OK" : "!"}</span>
+          <span>${mood.label}</span>
         </div>
       </div>
       <div class="quick-actions">
@@ -839,10 +851,13 @@ function renderDashboard() {
       </div>
     </section>
     <div class="summary-grid bank-metrics">
-      ${metric("Entradas", summary.income, "good")}
+      ${metric("Renda total", summary.salaryTotal + summary.income, "good")}
+      ${metric("Entradas extras", summary.income, "good")}
       ${metric("Saídas", summary.expense, "bad")}
       ${metric("Cartões", summary.cardMonth, "info")}
-      ${metric("Saldo devedor", summary.cardDebt, "warn")}
+      ${metric("Fixas pagas", summary.fixedPaid, "good")}
+      ${metric("Fixas pendentes", summary.fixedPending, "warn")}
+      ${metric("Guardado em metas", summary.goalsSaved, "info")}
     </div>
     <div class="grid-2">
       <div class="panel">
@@ -874,6 +889,30 @@ function renderDashboard() {
               <b>${formatMoney(person.balance)}</b>
             </div>
           `).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Próximas contas fixas</h2>
+        <div class="list">
+          ${upcomingFixed.length ? upcomingFixed.map((item) => `
+            <div class="list-item">
+              <div><strong>${item.name}</strong><span>Vence dia ${item.dueDay} · ${item.person}</span></div>
+              <b>${formatMoney(item.value)}</b>
+            </div>
+          `).join("") : emptyHtml()}
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Status do mês</h2>
+        <div class="insight-grid">
+          ${[
+            { label: "Contas pagas", value: formatMoney(summary.fixedPaid), note: "Já saíram do saldo" },
+            { label: "Ainda falta pagar", value: formatMoney(summary.fixedPending), note: "Pendências do mês" },
+            { label: "Fatura do mês", value: formatMoney(summary.cardMonth), note: "Parcelas em aberto" },
+            { label: "Metas guardadas", value: formatMoney(summary.goalsSaved), note: "Total acumulado" }
+          ].map((item) => `<div class="insight-card"><span>${item.label}</span><strong>${item.value}</strong><small>${item.note}</small></div>`).join("")}
         </div>
       </div>
     </div>
@@ -919,6 +958,42 @@ function dashboardInsights(summary) {
   ];
 }
 
+function fixedToPendingEntry(item) {
+  const year = new Date().getFullYear();
+  const date = new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+  return {
+    date,
+    category: item.category,
+    description: item.name,
+    value: item.value
+  };
+}
+
+function dashboardMood(balance, salaryTotal) {
+  if (balance < 0) {
+    return {
+      state: "sad",
+      label: "!",
+      text: "atenção",
+      message: "Atenção aos gastos, o saldo está negativo."
+    };
+  }
+  if (salaryTotal && balance <= salaryTotal * 0.1) {
+    return {
+      state: "neutral",
+      label: "meio",
+      text: "apertado",
+      message: "O mês está apertado. Vale segurar os gastos pequenos."
+    };
+  }
+  return {
+    state: "happy",
+    label: "OK",
+    text: "sobrou",
+    message: "Vocês estão indo muito bem esse mês."
+  };
+}
+
 function renderOnboarding() {
   let box = qs("#onboarding-box");
   if (!cloudReady || state.onboardingDone) {
@@ -956,12 +1031,13 @@ function onboardingStep(done, text) {
   return `<span class="${done ? "done" : ""}">${done ? "✓" : "•"} ${text}</span>`;
 }
 
-function coupleIllustration(balance) {
-  const happy = balance >= 0;
-  const mouth = happy ? "M 30 48 Q 40 58 50 48" : "M 30 56 Q 40 46 50 56";
-  const secondMouth = happy ? "M 94 48 Q 104 58 114 48" : "M 94 56 Q 104 46 114 56";
+function coupleIllustration(mood) {
+  const isHappy = mood.state === "happy";
+  const isNeutral = mood.state === "neutral";
+  const mouth = isHappy ? "M 30 48 Q 40 58 50 48" : isNeutral ? "M 30 52 L 50 52" : "M 30 56 Q 40 46 50 56";
+  const secondMouth = isHappy ? "M 94 48 Q 104 58 114 48" : isNeutral ? "M 94 52 L 114 52" : "M 94 56 Q 104 46 114 56";
   return `
-    <div class="couple-widget ${happy ? "happy" : "sad"}" aria-label="${happy ? "Casal feliz com dinheiro sobrando" : "Casal preocupado com saldo negativo"}">
+    <div class="couple-widget ${mood.state}" aria-label="${mood.message}">
       <svg viewBox="0 0 150 140" role="img">
         <circle class="coin coin-a" cx="118" cy="26" r="12"></circle>
         <circle class="coin coin-b" cx="32" cy="24" r="9"></circle>
@@ -979,7 +1055,7 @@ function coupleIllustration(balance) {
         <path class="body one" d="M16 120c4-30 18-46 36-46s32 16 36 46z"></path>
         <path class="body two" d="M64 120c4-30 18-46 36-46s32 16 36 46z"></path>
         <path class="arm" d="M62 86c12 9 24 9 36 0"></path>
-        ${happy ? `<text class="mood-text" x="75" y="132" text-anchor="middle">sobrou</text>` : `<text class="mood-text" x="75" y="132" text-anchor="middle">atenção</text>`}
+        <text class="mood-text" x="75" y="132" text-anchor="middle">${mood.text}</text>
       </svg>
     </div>
   `;
@@ -1011,26 +1087,22 @@ function bar(label, value, max, color) {
 function renderEntries() {
   const editing = editingEntryId ? state.entries.find((item) => item.id === editingEntryId) : null;
   if (editing) entryMode = editing.type;
+  if (entryMode === "Cartão") entryMode = "Despesa";
   const isIncome = entryMode === "Receita";
-  const isCard = entryMode === "Cartão";
   qs("#entries").innerHTML = `
     <form class="entry-form guided-form" id="entry-form">
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
         <button class="${entryMode === "Receita" ? "active" : ""}" type="button" data-entry-mode="Receita">Entrada</button>
         <button class="${entryMode === "Despesa" ? "active" : ""}" type="button" data-entry-mode="Despesa">Saída</button>
-        <button class="${entryMode === "Cartão" ? "active" : ""}" type="button" data-entry-mode="Cartão">Cartão</button>
       </div>
-      ${input("value", isCard ? "Valor da compra" : "Valor", "number", editing?.value || "", "0.01", "Valor total da entrada, saída ou compra.")}
-      ${input("date", isCard ? "Data da compra" : "Data", "date", editing?.date || new Date().toISOString().slice(0, 10), "", "Data em que aconteceu ou deve acontecer.")}
-      ${isCard ? select("card", "Qual cartão?", state.cards.map((item) => item.name), "", "Cartão onde essa compra entrou.") : ""}
-      ${isCard ? input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas da compra.") : ""}
-      ${isCard ? select("firstMonth", "Primeiro mês da fatura", months, "", "Mês em que a primeira parcela aparece na fatura.") : ""}
+      ${input("value", "Valor", "number", editing?.value || "", "0.01", "Valor total da entrada ou saída.")}
+      ${input("date", "Data", "date", editing?.date || new Date().toISOString().slice(0, 10), "", "Data em que aconteceu ou deve acontecer.")}
       ${select("category", isIncome ? "De onde veio?" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, "", "Ajuda o app a organizar o resumo por tipo.")}
-      ${input("description", isIncome ? "Descrição da entrada" : isCard ? "Nome da compra" : "Descrição da saída", "text", editing?.description || "", "", "Nome curto para reconhecer depois.")}
+      ${input("description", isIncome ? "Descrição da entrada" : "Descrição da saída", "text", editing?.description || "", "", "Nome curto para reconhecer depois.")}
       ${select("person", "Quem?", appPeople(), editing?.person, "Quem recebeu, pagou ou é responsável.")}
-      ${!isCard && !isIncome ? select("payment", "Como foi pago?", state.paymentTypes, "", "Forma de pagamento usada nessa saída.") : ""}
-      ${!isCard ? select("account", isIncome ? "Conta que recebeu" : "Conta de onde saiu", accountOptions(), "", "Conta/carteira onde o dinheiro entrou ou saiu.") : ""}
-      ${!isCard && !isIncome ? select("status", "Situação", ["Pago", "Pendente"], "", "Pago já saiu da conta. Pendente ainda está para pagar.") : ""}
+      ${!isIncome ? select("payment", "Como foi pago?", state.paymentTypes.filter((item) => item !== "Cartão de Crédito"), "", "Forma de pagamento usada nessa saída.") : ""}
+      ${select("account", isIncome ? "Conta que recebeu" : "Conta de onde saiu", accountOptions(), "", "Conta/carteira onde o dinheiro entrou ou saiu.")}
+      ${!isIncome ? select("status", "Situação", ["Pago", "Pendente"], "", "Pago já saiu da conta. Pendente ainda está para pagar.") : ""}
       <label class="field span-2"><span>Observação opcional</span><input name="notes"></label>
       <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
       ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
@@ -1101,23 +1173,6 @@ function generateRecurring() {
 function addEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  if (entryMode === "Cartão") {
-    state.installments.unshift({
-      id: crypto.randomUUID(),
-      date: data.date,
-      card: data.card,
-      description: data.description,
-      category: data.category,
-      value: Number(data.value || 0),
-      parts: Number(data.parts || 1),
-      firstMonth: data.firstMonth,
-      paidMonths: []
-    });
-    notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
-    commitState();
-    return;
-  }
-
   const payload = {
     id: editingEntryId || crypto.randomUUID(),
     date: data.date,
@@ -1145,6 +1200,65 @@ function addEntry(event) {
 
 function accountOptions() {
   return state.accounts.length ? state.accounts.map((item) => item.name) : ["Carteira"];
+}
+
+function renderFixedBills() {
+  qs("#fixed").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Contas Fixas</h2>
+      <p>Cadastre aluguel, internet, energia, água, financiamentos e dívidas mensais. Marque como pago quando o dinheiro sair.</p>
+    </div>
+    <form class="settings-form" id="fixed-form">
+      <div class="span-3"><h2>Adicionar conta fixa</h2></div>
+      ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
+      ${input("value", "Valor", "number", "0", "0.01", "Valor mensal dessa conta.")}
+      ${input("dueDay", "Vencimento", "number", "10", "1", "Dia do mês em que vence.")}
+      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa conta fixa.")}
+      ${select("person", "Responsável", appPeople(), "", "Quem costuma pagar ou acompanhar essa conta.")}
+      ${select("status", "Status", ["Pendente", "Pago"], "Pendente", "Pago entra no cálculo do saldo. Pendente aparece em atenção.")}
+      <button class="primary form-submit" type="submit">Salvar conta fixa</button>
+    </form>
+    <div class="wallet-list">
+      ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
+    </div>
+  `;
+  qs("#fixed-form").addEventListener("submit", addFixedBill);
+}
+
+function fixedBillCard(item) {
+  return `
+    <article class="wallet-account fixed-bill ${item.status === "Pago" ? "paid" : "pending"}">
+      <div>
+        <span>${item.category}</span>
+        <strong>${item.name}</strong>
+        <small>Vence dia ${item.dueDay} · ${item.person}</small>
+      </div>
+      <div class="wallet-account-money">
+        <span>${item.status}</span>
+        <strong>${formatMoney(item.value)}</strong>
+      </div>
+      <div class="wallet-account-flow">
+        <button class="tiny ghost" data-toggle-fixed="${item.id}">${item.status === "Pago" ? "Marcar pendente" : "Marcar pago"}</button>
+        <button class="tiny danger" data-delete-fixed="${item.id}">Excluir</button>
+      </div>
+    </article>
+  `;
+}
+
+function addFixedBill(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  state.fixedBills.push({
+    id: crypto.randomUUID(),
+    name: data.name,
+    value: Number(data.value || 0),
+    dueDay: Number(data.dueDay || 1),
+    category: data.category,
+    person: data.person,
+    status: data.status
+  });
+  notify("sync", `Conta fixa adicionada: ${data.name}`);
+  commitState();
 }
 
 function renderCards() {
@@ -1376,16 +1490,21 @@ function addIncome(event) {
 }
 
 function renderMethod() {
-  const income = Number(state.methodIncome || 0);
+  const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+  const income = salaryTotal || Number(state.methodIncome || 0);
   const rows = [
-    ["50%", "Essenciais", income * .5, "#245f9f"],
-    ["30%", "Guardar e investir", income * .3, "#1f7a5b"],
-    ["20%", "Desejos e flexíveis", income * .2, "#af7b20"]
+    ["50%", "Necessidades", income * .5, "#1677ff"],
+    ["30%", "Guardar e investir", income * .3, "#00a86b"],
+    ["20%", "Desejos e lazer", income * .2, "#f4a51c"]
   ];
   qs("#method").innerHTML = `
+    <div class="panel helper-panel">
+      <h2>Método 50/30/20</h2>
+      <p>${salaryTotal ? "Calculado automaticamente pelos salários cadastrados." : "Cadastre os salários em Cadastros ou informe uma renda manual abaixo."}</p>
+    </div>
     <form class="entry-form" id="method-form">
-      ${input("methodIncome", "Total de rendas", "number", state.methodIncome, "0.01")}
-      <button class="primary" type="submit">Atualizar</button>
+      ${input("methodIncome", "Renda manual", "number", state.methodIncome, "0.01", "Usada somente se os salários do casal estiverem zerados.")}
+      <button class="primary" type="submit">Salvar renda manual</button>
     </form>
     <div class="panel method-box">
       ${rows.map(([percent, label, value, color]) => `
@@ -1422,12 +1541,17 @@ function renderGoals() {
 
 function goalCard(goal) {
   const percent = Math.min(100, Math.round((Number(goal.saved || 0) / Math.max(1, Number(goal.target || 0))) * 100));
+  const missing = Math.max(0, Number(goal.target || 0) - Number(goal.saved || 0));
   return `<article class="panel progress-line">
     <h2>${goal.title}</h2>
     <div class="progress-meta"><span>${formatMoney(goal.saved)} de ${formatMoney(goal.target)}</span><strong>${percent}%</strong></div>
     <div class="track"><div class="fill" style="--w:${percent}%;--c:${percent >= 100 ? "#1f7a5b" : "#af7b20"}"></div></div>
-    <div class="progress-meta"><span>${goal.due ? dateFmt.format(new Date(`${goal.due}T00:00:00Z`)) : "Sem data"}</span>${pill(goal.status, goal.status === "Concluído" ? "done" : "")}</div>
-    <button class="tiny danger" data-delete-goal="${goal.id}">Excluir</button>
+    <div class="progress-meta"><span>Falta ${formatMoney(missing)} · ${goal.due ? dateFmt.format(new Date(`${goal.due}T00:00:00Z`)) : "Sem data"}</span>${pill(goal.status, goal.status === "Concluído" ? "done" : "")}</div>
+    <div class="card-actions">
+      <button class="tiny ghost" data-add-goal="${goal.id}">Adicionar guardado</button>
+      <button class="tiny ghost" data-edit-goal="${goal.id}">Editar valores</button>
+      <button class="tiny danger" data-delete-goal="${goal.id}">Excluir</button>
+    </div>
   </article>`;
 }
 
@@ -1443,9 +1567,11 @@ function renderSettings() {
   qs("#settings").innerHTML = `
     <form class="settings-form" id="profile-form">
       <div class="span-3"><h2>Perfil do casal</h2></div>
-      ${input("personOne", "Primeira pessoa", "text", state.profile.personOne || "Ele")}
-      ${input("personTwo", "Segunda pessoa", "text", state.profile.personTwo || "Ela")}
-      <button class="primary" type="submit">Salvar nomes</button>
+      ${input("personOne", "Primeira pessoa", "text", state.profile.personOne || "Ele", "", "Nome que aparece nos lançamentos e relatórios.")}
+      ${input("salaryOne", "Salário da primeira pessoa", "number", state.profile.salaryOne || 0, "0.01", "Renda mensal usada no dashboard e no 50/30/20.")}
+      ${input("personTwo", "Segunda pessoa", "text", state.profile.personTwo || "Ela", "", "Nome que aparece nos lançamentos e relatórios.")}
+      ${input("salaryTwo", "Salário da segunda pessoa", "number", state.profile.salaryTwo || 0, "0.01", "Renda mensal usada no dashboard e no 50/30/20.")}
+      <button class="primary form-submit" type="submit">Salvar perfil</button>
     </form>
     <div class="grid-2">
       <div class="panel">
@@ -1552,7 +1678,12 @@ function importData(event) {
 function saveProfile(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  state.profile = { personOne: data.personOne, personTwo: data.personTwo };
+  state.profile = {
+    personOne: data.personOne,
+    personTwo: data.personTwo,
+    salaryOne: Number(data.salaryOne || 0),
+    salaryTwo: Number(data.salaryTwo || 0)
+  };
   notify("sync", "Perfil do casal atualizado");
   commitState();
 }
@@ -1617,6 +1748,7 @@ document.addEventListener("click", (event) => {
     ["deleteInstallment", "installments", "installment"],
     ["deleteAccount", "accounts", "account"],
     ["deleteCard", "cards", "card"],
+    ["deleteFixed", "fixedBills", "fixed"],
     ["deleteGoal", "goals", "goal"]
   ];
   for (const [datasetKey, stateKey] of deleteMap) {
@@ -1634,6 +1766,45 @@ document.addEventListener("click", (event) => {
     document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === "entries"));
     qs("#page-title").textContent = pageTitle("entries");
     renderEntries();
+  }
+
+  if (event.target.dataset.toggleFixed) {
+    state.fixedBills = (state.fixedBills || []).map((item) => {
+      if (item.id !== event.target.dataset.toggleFixed) return item;
+      return { ...item, status: item.status === "Pago" ? "Pendente" : "Pago" };
+    });
+    notify("sync", "Status da conta fixa atualizado");
+    commitState();
+  }
+
+  if (event.target.dataset.addGoal) {
+    const goal = state.goals.find((item) => item.id === event.target.dataset.addGoal);
+    if (!goal) return;
+    const value = Number(prompt("Quanto você quer adicionar ao valor guardado?", "0") || 0);
+    if (!value) return;
+    goal.saved = Number(goal.saved || 0) + value;
+    if (goal.saved >= Number(goal.target || 0)) goal.status = "Concluído";
+    notify("goal", `Meta atualizada: ${goal.title}`);
+    commitState();
+  }
+
+  if (event.target.dataset.editGoal) {
+    const goal = state.goals.find((item) => item.id === event.target.dataset.editGoal);
+    if (!goal) return;
+    const target = prompt("Qual é o valor total da meta?", goal.target);
+    const saved = prompt("Quanto já está guardado?", goal.saved);
+    if (target === null || saved === null) return;
+    goal.target = Number(target || 0);
+    goal.saved = Number(saved || 0);
+    goal.status = goal.saved >= goal.target && goal.target > 0 ? "Concluído" : "Em progresso";
+    notify("goal", `Valores da meta editados: ${goal.title}`);
+    commitState();
+  }
+
+  const help = event.target.closest(".help-dot");
+  if (help) {
+    event.preventDefault();
+    alert(help.getAttribute("aria-label") || help.title || "Ajuda deste campo.");
   }
 
   if (event.target.dataset.payCardMonth) {

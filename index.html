@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#25302f">
+    <meta name="theme-color" content="#073030">
     <title>Finanças do Casal</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="app-icon.svg" type="image/svg+xml">
@@ -23,8 +23,9 @@
       <nav class="tabs" aria-label="Seções">
         <button class="tab active" data-view="dashboard" title="Visão geral">⌂ <span>Visão geral</span></button>
         <button class="tab" data-view="entries" title="Lançamentos">＋ <span>Lançamentos</span></button>
+        <button class="tab" data-view="fixed" title="Contas Fixas">◷ <span>Contas Fixas</span></button>
         <button class="tab" data-view="cards" title="Cartões">▣ <span>Cartões</span></button>
-        <button class="tab" data-view="accounts" title="Nossa Carteira">≋ <span>Nossa Carteira</span></button>
+        <button class="tab" data-view="accounts" title="Nossa Carteira">≋ <span>Carteira</span></button>
         <button class="tab" data-view="method" title="50/30/20">◴ <span>50/30/20</span></button>
         <button class="tab" data-view="goals" title="Metas">◇ <span>Metas</span></button>
         <button class="tab" data-view="settings" title="Cadastros">⚙ <span>Cadastros</span></button>
@@ -49,6 +50,7 @@
 
       <section class="view active" id="dashboard"></section>
       <section class="view" id="entries"></section>
+      <section class="view" id="fixed"></section>
       <section class="view" id="cards"></section>
       <section class="view" id="accounts"></section>
       <section class="view" id="method"></section>
