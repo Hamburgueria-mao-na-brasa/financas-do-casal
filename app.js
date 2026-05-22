@@ -997,37 +997,14 @@ function renderDashboard() {
   const forecast = monthForecast(summary);
   const report = monthlyReport();
   const insights = dashboardInsights(summary);
-  const fixedAlerts = fixedBillsWithDueInfo()
-    .filter((item) => !isFixedPaid(item) && item.priority !== "normal")
-    .slice(0, 4);
-  const pending = [
-    ...state.entries.filter((item) => item.status === "Pendente"),
-    ...(state.fixedBills || []).filter((item) => !isFixedPaid(item)).map(fixedToPendingEntry)
-  ].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   const budgetAlerts = budgetWarnings();
-  const attentionHtml = [
-    ...fixedAlerts.map(fixedAlertItem),
-    ...budgetAlerts.map((item) => `<div class="list-item"><div><strong>${item.category}</strong><span>${item.percent}% do orçamento usado</span></div><b>${formatMoney(item.spent)} / ${formatMoney(item.limit)}</b></div>`),
-    ...pending.map((item) => `<div class="list-item"><div><strong>${item.description || item.category}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`)
-  ].join("");
-  const recentEntries = [...state.entries]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 6);
   const categoryTotals = byMonth(state.entries)
     .filter((item) => item.type === "Despesa")
     .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
-  const maxCategory = Math.max(1, ...Object.values(categoryTotals));
   const chartData = monthChartData(summary);
-  const upcomingFixed = fixedBillsWithDueInfo()
-    .filter((item) => !isFixedPaid(item))
-    .slice(0, 5);
+  const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const actionCards = dashboardActionCards(summary, forecast, todaySummary(), budgetAlerts, topCategory);
   const mood = dashboardMood(summary.balance, summary.salaryTotal);
-  const people = appPeople().map((name) => {
-    const personEntries = byMonth(state.entries).filter((item) => item.person === name);
-    const income = total(personEntries.filter((item) => item.type === "Receita"));
-    const expense = total(personEntries.filter((item) => item.type === "Despesa"));
-    return { name, income, expense, balance: income - expense };
-  });
   const today = todaySummary();
 
   qs("#dashboard").innerHTML = `
@@ -1057,15 +1034,6 @@ function renderDashboard() {
       ${metric("Fatura atual", summary.cardMonth, "info")}
       ${metric("Meta guardada", summary.goalsSaved, "good")}
     </div>
-    <div class="summary-grid bank-metrics">
-      ${metric("Renda total", summary.salaryTotal + summary.income, "good")}
-      ${metric("Entradas extras", summary.income, "good")}
-      ${metric("Saídas", summary.expense, "bad")}
-      ${metric("Cartões", summary.cardMonth, "info")}
-      ${metric("Fixas pagas", summary.fixedPaid, "good")}
-      ${metric("Fixas pendentes", summary.fixedPending, "warn")}
-      ${metric("Guardado em metas", summary.goalsSaved, "info")}
-    </div>
     <div class="grid-2">
       <div class="panel today-panel">
         <h2>Hoje</h2>
@@ -1078,19 +1046,9 @@ function renderDashboard() {
         <button class="ghost" type="button" data-view="agenda">Ver agenda</button>
       </div>
       <div class="panel">
-        <h2>Previsão do mês</h2>
+        <h2>O que merece atenção</h2>
         <div class="list">
-          <div class="list-item"><div><strong>Saldo atual</strong><span>Receitas, gastos pagos e fatura aberta</span></div><b>${formatMoney(summary.balance)}</b></div>
-          <div class="list-item"><div><strong>Contas pendentes</strong><span>Ainda falta pagar neste mês</span></div><b>${formatMoney(summary.fixedPending)}</b></div>
-          <div class="list-item"><div><strong>Depois de pagar tudo</strong><span>Saldo previsto do mês</span></div><b>${formatMoney(forecast.afterAll)}</b></div>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Comparativo mensal</h2>
-        <div class="list">
-          <div class="list-item"><div><strong>Gastos vs mês anterior</strong><span>${report.expenseText}</span></div><b>${formatMoney(report.expenseDiff)}</b></div>
-          <div class="list-item"><div><strong>Entradas vs mês anterior</strong><span>${report.incomeText}</span></div><b>${formatMoney(report.incomeDiff)}</b></div>
-          <div class="list-item"><div><strong>Categoria que mais pesa</strong><span>${report.topCategory || "Sem categoria"}</span></div><b>${formatMoney(report.topCategoryValue)}</b></div>
+          ${actionCards.map(dashboardActionCard).join("")}
         </div>
       </div>
     </div>
@@ -1114,66 +1072,11 @@ function renderDashboard() {
         </div>
       </div>
       <div class="panel">
-        <h2>Atenção</h2>
+        <h2>Comparativo mensal</h2>
         <div class="list">
-          ${attentionHtml || emptyHtml()}
-        </div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <h2>Extrato recente</h2>
-        <div class="statement-list">
-          ${recentEntries.length ? recentEntries.map(statementItem).join("") : emptyHtml()}
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Conta do casal</h2>
-        <div class="list">
-          ${people.map((person) => `
-            <div class="list-item">
-              <div><strong>${person.name}</strong><span>Receitas ${formatMoney(person.income)} · Despesas ${formatMoney(person.expense)}</span></div>
-              <b>${formatMoney(person.balance)}</b>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <h2>Próximas contas fixas</h2>
-        <div class="list">
-          ${upcomingFixed.length ? upcomingFixed.map((item) => `
-            <div class="list-item due-item ${item.priority}">
-              <div><strong>${item.name}</strong><span>${item.dueText} · ${item.person} · ${item.category}</span></div>
-              <b>${formatMoney(item.value)}</b>
-            </div>
-          `).join("") : emptyHtml()}
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Status do mês</h2>
-        <div class="insight-grid">
-          ${[
-            { label: "Contas pagas", value: formatMoney(summary.fixedPaid), note: "Já saíram do saldo" },
-            { label: "Ainda falta pagar", value: formatMoney(summary.fixedPending), note: "Pendências do mês" },
-            { label: "Fatura do mês", value: formatMoney(summary.cardMonth), note: "Parcelas em aberto" },
-            { label: "Metas guardadas", value: formatMoney(summary.goalsSaved), note: "Total acumulado" }
-          ].map((item) => `<div class="insight-card"><span>${item.label}</span><strong>${item.value}</strong><small>${item.note}</small></div>`).join("")}
-        </div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <h2>Despesas por categoria</h2>
-        <div class="bars">
-          ${Object.entries(categoryTotals).length ? Object.entries(categoryTotals).map(([name, value]) => bar(name, value, maxCategory, "#e04f3f")).join("") : emptyHtml()}
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Metas em andamento</h2>
-        <div class="compact-goals">
-          ${state.goals.length ? state.goals.slice(0, 3).map(goalCard).join("") : emptyHtml()}
+          <div class="list-item"><div><strong>Gastos vs mês anterior</strong><span>${report.expenseText}</span></div><b>${formatMoney(report.expenseDiff)}</b></div>
+          <div class="list-item"><div><strong>Entradas vs mês anterior</strong><span>${report.incomeText}</span></div><b>${formatMoney(report.incomeDiff)}</b></div>
+          <div class="list-item"><div><strong>Categoria que mais pesa</strong><span>${report.topCategory || "Sem categoria"}</span></div><b>${formatMoney(report.topCategoryValue)}</b></div>
         </div>
       </div>
     </div>
@@ -1186,6 +1089,39 @@ function budgetWarnings(includeAll = false) {
     const spent = total(monthExpenses.filter((item) => item.category === category));
     return { category, limit, spent, percent: Math.round((spent / Math.max(1, limit)) * 100) };
   }).filter((item) => item.limit > 0 && (includeAll || item.percent >= 80));
+}
+
+function dashboardActionCards(summary, forecast, today, budgetAlerts, topCategory) {
+  const fixedAlerts = fixedBillsWithDueInfo().filter((item) => !isFixedPaid(item) && item.priority !== "normal");
+  const cards = [];
+  if (forecast.afterAll < 0) {
+    cards.push({ title: "Saldo previsto negativo", note: "Depois das pendências, o mês fecha no vermelho.", value: formatMoney(forecast.afterAll), view: "fixed", tone: "bad" });
+  }
+  if (fixedAlerts.length) {
+    cards.push({ title: "Contas vencendo", note: `${fixedAlerts.length} gasto${fixedAlerts.length === 1 ? "" : "s"} fixo${fixedAlerts.length === 1 ? "" : "s"} precisa${fixedAlerts.length === 1 ? "" : "m"} de atenção.`, value: String(fixedAlerts.length), view: "agenda", tone: "warn" });
+  }
+  if (summary.cardMonth > 0) {
+    cards.push({ title: "Fatura do mês", note: "Veja compras abertas e pagas na tela de cartões.", value: formatMoney(summary.cardMonth), view: "cards", tone: "info" });
+  }
+  if (budgetAlerts.length) {
+    cards.push({ title: "Orçamento no limite", note: `${budgetAlerts[0].category} já usou ${budgetAlerts[0].percent}% do limite.`, value: formatMoney(budgetAlerts[0].spent), view: "settings", tone: "warn" });
+  }
+  if (today.dueToday || today.overdue) {
+    cards.push({ title: "Vencimentos de hoje", note: `${today.dueToday} vence hoje · ${today.overdue} atrasada${today.overdue === 1 ? "" : "s"}.`, value: String(today.dueToday + today.overdue), view: "agenda", tone: today.overdue ? "bad" : "warn" });
+  }
+  if (!cards.length) {
+    cards.push({ title: "Mês sob controle", note: topCategory ? `Maior categoria: ${topCategory[0]}.` : "Nenhum alerta importante agora.", value: formatMoney(topCategory?.[1] || 0), view: "statement", tone: "good" });
+  }
+  return cards.slice(0, 4);
+}
+
+function dashboardActionCard(item) {
+  return `
+    <button class="list-item dashboard-action ${item.tone}" type="button" data-view="${item.view}">
+      <div><strong>${item.title}</strong><span>${item.note}</span></div>
+      <b>${item.value}</b>
+    </button>
+  `;
 }
 
 function monthForecast(summary = currentSummary()) {
@@ -1825,6 +1761,7 @@ function editFixedBill(id) {
 }
 
 function renderCards() {
+  const cardTableRows = state.installments.slice(0, 8);
   qs("#cards").innerHTML = `
     <div class="panel helper-panel">
       <h2>Compras no cartão</h2>
@@ -1849,15 +1786,16 @@ function renderCards() {
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
-    ${table(["Compra", "Cartão", "Categoria", "Valor", "Parcelas", "1º mês", ""], state.installments.map((item) => [
-      item.description,
-      item.card,
-      item.category,
-      `<td class="amount">${formatMoney(item.value)}</td>`,
-      item.parts,
-      item.firstMonth,
-      `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
-    ]))}
+    <div class="panel">
+      <h2>Compras recentes</h2>
+      ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], cardTableRows.map((item) => [
+        item.description,
+        item.card,
+        `<td class="amount">${formatMoney(item.value)}</td>`,
+        item.parts,
+        `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
+      ]))}
+    </div>
   `;
   qs("#card-form").addEventListener("submit", addInstallment);
 }

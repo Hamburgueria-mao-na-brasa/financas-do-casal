@@ -289,6 +289,14 @@ button {
   box-shadow: inset 3px 0 0 #ffcf43;
 }
 
+.tab[data-view="cards"],
+.tab[data-view="accounts"],
+.tab[data-view="method"],
+.tab[data-view="goals"],
+.tab[data-view="settings"] {
+  display: none;
+}
+
 .shell {
   padding: 24px;
   min-width: 0;
