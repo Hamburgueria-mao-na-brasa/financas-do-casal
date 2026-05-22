@@ -1015,6 +1015,83 @@ h2 {
   gap: 12px;
 }
 
+.chart-card {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.donut {
+  width: 210px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--segments));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18), 0 18px 36px rgba(16, 69, 92, .12);
+  position: relative;
+}
+
+.donut::after {
+  content: "";
+  position: absolute;
+  inset: 34px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.donut div {
+  max-width: 112px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.donut strong,
+.donut span {
+  display: block;
+}
+
+.donut strong {
+  font-size: 18px;
+}
+
+.donut span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chart-legend {
+  display: grid;
+  gap: 10px;
+}
+
+.chart-legend div {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfffd;
+}
+
+.chart-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+.chart-legend span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .bar-row {
   display: grid;
   grid-template-columns: 150px 1fr 96px;
@@ -1467,6 +1544,25 @@ td.amount {
   transform: translateX(2px);
 }
 
+.due-item {
+  border-left: 5px solid var(--blue);
+}
+
+.due-item.soon {
+  border-left-color: var(--gold);
+  background: linear-gradient(135deg, #fffdf8, #fff5df);
+}
+
+.due-item.today {
+  border-left-color: var(--pink);
+  background: linear-gradient(135deg, #fff7fb, #ffeef5);
+}
+
+.due-item.overdue {
+  border-left-color: var(--red);
+  background: linear-gradient(135deg, #fff8f7, #ffebe8);
+}
+
 .list-item strong, .list-item span {
   display: block;
 }
@@ -1838,6 +1934,30 @@ td.amount {
     gap: 6px;
   }
 
+  .chart-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .donut {
+    width: min(240px, 72vw);
+  }
+
+  .donut::after {
+    background: #103533;
+    border-color: rgba(183, 255, 238, .16);
+  }
+
+  .chart-legend {
+    width: 100%;
+  }
+
+  .chart-legend div {
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .06);
+    border-color: rgba(183, 255, 238, .12);
+  }
+
   .entry-form,
   .guided-form,
   .settings-form {
@@ -1997,6 +2117,18 @@ td.amount {
     color: #f2fff9;
     background: rgba(255, 255, 255, .06);
     border-color: rgba(183, 255, 238, .12);
+  }
+
+  .due-item.soon {
+    background: rgba(255, 176, 32, .10);
+  }
+
+  .due-item.today {
+    background: rgba(255, 79, 139, .12);
+  }
+
+  .due-item.overdue {
+    background: rgba(240, 68, 56, .14);
   }
 
   .wallet-account-money,

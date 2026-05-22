@@ -855,6 +855,7 @@ function renderDashboard() {
     .filter((item) => item.type === "Despesa")
     .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
   const maxCategory = Math.max(1, ...Object.values(categoryTotals));
+  const chartData = monthChartData(summary);
   const upcomingFixed = fixedBillsWithDueInfo()
     .filter((item) => item.status !== "Pago")
     .slice(0, 5);
@@ -895,6 +896,18 @@ function renderDashboard() {
       ${metric("Fixas pagas", summary.fixedPaid, "good")}
       ${metric("Fixas pendentes", summary.fixedPending, "warn")}
       ${metric("Guardado em metas", summary.goalsSaved, "info")}
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Gráfico do mês</h2>
+        ${donutChart(chartData)}
+      </div>
+      <div class="panel">
+        <h2>Distribuição</h2>
+        <div class="bars">
+          ${chartData.map((item) => bar(item.label, item.value, Math.max(1, ...chartData.map((row) => row.value)), item.color)).join("")}
+        </div>
+      </div>
     </div>
     <div class="grid-2">
       <div class="panel">
@@ -976,6 +989,79 @@ function budgetWarnings() {
     const spent = total(monthExpenses.filter((item) => item.category === category));
     return { category, limit, spent, percent: Math.round((spent / Math.max(1, limit)) * 100) };
   }).filter((item) => item.limit > 0 && item.percent >= 80);
+}
+
+function fixedBillsWithDueInfo() {
+  const now = new Date();
+  const selectedIndex = monthIndex(state.selectedMonth);
+  const selectedYear = selectedIndex < now.getMonth() ? now.getFullYear() + 1 : now.getFullYear();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return [...(state.fixedBills || [])].map((item) => {
+    const dueDate = new Date(selectedYear, selectedIndex, Math.min(Number(item.dueDay || 1), 28));
+    const diffDays = Math.round((dueDate - todayStart) / 86400000);
+    let priority = "normal";
+    let dueText = `Vence dia ${item.dueDay}`;
+    if (diffDays < 0) {
+      priority = "overdue";
+      dueText = `Atrasada há ${Math.abs(diffDays)} dia${Math.abs(diffDays) === 1 ? "" : "s"}`;
+    } else if (diffDays === 0) {
+      priority = "today";
+      dueText = "Vence hoje";
+    } else if (diffDays <= 7) {
+      priority = "soon";
+      dueText = `Vence em ${diffDays} dia${diffDays === 1 ? "" : "s"}`;
+    }
+    return { ...item, dueDate, diffDays, priority, dueText };
+  }).sort((a, b) => {
+    const order = { overdue: 0, today: 1, soon: 2, normal: 3 };
+    return order[a.priority] - order[b.priority] || a.dueDate - b.dueDate;
+  });
+}
+
+function fixedAlertItem(item) {
+  return `
+    <div class="list-item due-item ${item.priority}">
+      <div><strong>${item.name}</strong><span>${item.dueText} · conta fixa</span></div>
+      <b>${formatMoney(item.value)}</b>
+    </div>
+  `;
+}
+
+function monthChartData(summary) {
+  return [
+    { label: "Entradas", value: summary.salaryTotal + summary.income, color: "#00bf7a" },
+    { label: "Saídas", value: summary.expense, color: "#f04438" },
+    { label: "Cartões", value: summary.cardMonth, color: "#147dff" },
+    { label: "Contas fixas", value: summary.fixedPaid + summary.fixedPending, color: "#ffb020" }
+  ].filter((item) => item.value > 0);
+}
+
+function donutChart(items) {
+  if (!items.length) return emptyHtml();
+  const totalValue = items.reduce((sum, item) => sum + item.value, 0);
+  let cursor = 0;
+  const segments = items.map((item) => {
+    const start = cursor;
+    const size = Math.max(1, (item.value / totalValue) * 100);
+    cursor += size;
+    return `${item.color} ${start}% ${cursor}%`;
+  }).join(", ");
+  return `
+    <div class="chart-card">
+      <div class="donut" style="--segments:${segments}">
+        <div><strong>${formatMoney(totalValue)}</strong><span>Total movimentado</span></div>
+      </div>
+      <div class="chart-legend">
+        ${items.map((item) => `
+          <div>
+            <i style="--c:${item.color}"></i>
+            <span>${item.label}</span>
+            <strong>${formatMoney(item.value)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function dashboardInsights(summary) {
