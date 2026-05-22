@@ -288,11 +288,13 @@ function renderGate(message = "") {
             <button class="ghost" id="logout" type="button">Usar outro e-mail</button>
           </div>
         ` : `
-          <h1>Preparando sua conta</h1>
-          <p>Estamos criando seu espaço financeiro vazio para você começar do zero.</p>
+          <h1>Escolha seu espaço financeiro</h1>
+          <p>Para compartilhar com seu companheiro, entre com o código dele. Se for começar sozinho, crie um cofre novo.</p>
           <form class="auth-actions" id="manual-invite-form">
             <label class="field"><span>Código de convite</span><input name="code" placeholder="CASAL-ABC123"></label>
-            <button class="ghost" type="submit">Entrar com código</button>
+            <button class="primary" type="submit">Entrar com código</button>
+            <button class="ghost" id="create-household" type="button">Criar cofre novo</button>
+            <button class="ghost" id="logout" type="button">Usar outro e-mail</button>
           </form>
         `}
         ${message ? `<p class="mini-status">${message}</p>` : ""}
@@ -307,6 +309,8 @@ function renderGate(message = "") {
       event.preventDefault();
       joinHousehold(new FormData(event.target).get("code"));
     });
+    const create = qs("#create-household");
+    if (create) create.addEventListener("click", createHousehold);
     return;
   }
 
@@ -334,6 +338,7 @@ function renderCloudPanel(message = "") {
     ${syncStatus ? `<span class="mini-status">${syncStatus}</span>` : ""}
     ${inviteLink ? `<span class="mini-status invite-link" title="${inviteLink}">Convite do companheiro</span>` : ""}
     <button class="ghost" id="copy-invite" type="button">Adicionar companheiro</button>
+    <button class="ghost" id="join-by-code" type="button">Entrar com código</button>
     <button class="ghost" id="logout" type="button">Sair</button>
     ${message ? `<span class="mini-status">${message}</span>` : ""}
   `;
@@ -347,6 +352,7 @@ function renderCloudPanel(message = "") {
   });
   qs("#logout").addEventListener("click", signOut);
   qs("#copy-invite").addEventListener("click", copyInviteLink);
+  qs("#join-by-code").addEventListener("click", promptJoinHousehold);
   renderNotifications();
 }
 
@@ -535,6 +541,23 @@ async function copyInviteLink() {
   }
 }
 
+function promptJoinHousehold() {
+  const code = prompt("Cole aqui o código de convite do cofre compartilhado:", "");
+  if (!code) return;
+  joinHousehold(code);
+}
+
+function showJoinError(message) {
+  loadingCloud = false;
+  const text = message || "Não conseguimos entrar no cofre. Confira o código e tente de novo.";
+  if (cloudReady) {
+    alert(text);
+    renderCloudPanel(text);
+    return;
+  }
+  renderGate(text);
+}
+
 async function handlePasswordAuth(event) {
   event.preventDefault();
   const form = new FormData(event.target);
@@ -609,10 +632,16 @@ async function createHousehold() {
   const id = crypto.randomUUID();
   const code = makeInviteCode();
   const { error: householdError } = await cloud.from("households").insert({ id, name: "Finanças do Casal", invite_code: code, created_by: currentUser.id });
-  if (householdError) return renderGate(householdError.message);
+  if (householdError) {
+    loadingCloud = false;
+    return renderGate(householdError.message);
+  }
 
   const { error: memberError } = await cloud.from("household_members").insert({ household_id: id, user_id: currentUser.id, role: "owner" });
-  if (memberError) return renderGate(memberError.message);
+  if (memberError) {
+    loadingCloud = false;
+    return renderGate(memberError.message);
+  }
 
   householdId = id;
   householdInviteCode = code;
@@ -628,13 +657,14 @@ async function createHousehold() {
 }
 
 async function joinHousehold(code) {
-  if (!code) return renderGate("Convite inválido");
+  if (!code) return showJoinError("Convite inválido");
   loadingCloud = true;
   renderGate("Confirmando convite...");
-  const { data, error } = await cloud.rpc("join_household_by_code", { join_code: code });
-  if (error) return renderGate(error.message);
+  const normalizedCode = String(code).trim().toUpperCase();
+  const { data, error } = await cloud.rpc("join_household_by_code", { join_code: normalizedCode });
+  if (error) return showJoinError(error.message);
   householdId = data;
-  householdInviteCode = code.trim().toUpperCase();
+  householdInviteCode = normalizedCode;
   localStorage.setItem("coupleFinanceHouseholdId", householdId);
   localStorage.setItem("coupleFinanceInviteCode", householdInviteCode);
   await loadCloudState();
@@ -661,12 +691,8 @@ async function loadExistingHousehold() {
     .limit(1);
 
   if (!memberships?.length) {
-    if (getInviteParam()) {
-      cloudReady = false;
-      render();
-      return;
-    }
-    await createHousehold();
+    cloudReady = false;
+    render();
     return;
   }
 
