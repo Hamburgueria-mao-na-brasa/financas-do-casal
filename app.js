@@ -1577,43 +1577,55 @@ function renderEntries() {
   if (editing) entryMode = editing.type;
   if (entryMode === "Cartão") entryMode = "Despesa";
   const isIncome = entryMode === "Receita";
-  const filteredEntries = filterEntries(state.entries);
+  const monthEntries = byMonth(state.entries);
+  const filteredEntries = filterEntries(monthEntries);
+  const entryIncome = total(monthEntries.filter((item) => item.type === "Receita"));
+  const entryExpense = total(monthEntries.filter((item) => item.type === "Despesa"));
+  const pendingExpense = total(monthEntries.filter((item) => item.type === "Despesa" && item.status === "Pendente"));
   qs("#entries").innerHTML = `
-    <div class="panel helper-panel">
-      <h2>Lançamentos</h2>
-      <p>Use esta tela para entradas e saídas feitas na hora. Cartão e contas fixas ficam separados para não misturar.</p>
-    </div>
+    <section class="feature-hero entries-hero">
+      <div>
+        <span>Movimento do mês</span>
+        <h2>Lançamentos simples</h2>
+        <p>Entradas e saídas feitas na hora. Cartão e contas fixas ficam separados para não misturar.</p>
+      </div>
+      <div class="feature-stats">
+        <div><span>Entradas</span><strong>${formatMoney(entryIncome)}</strong></div>
+        <div><span>Saídas</span><strong>${formatMoney(entryExpense)}</strong></div>
+        <div><span>Pendente</span><strong>${formatMoney(pendingExpense)}</strong></div>
+      </div>
+    </section>
     <form class="entry-form guided-form" id="entry-form">
+      <div class="span-3 form-heading"><span>${editing ? "✎" : "+"}</span><div><h2>${editing ? "Editar lançamento" : "Novo lançamento"}</h2><small>Use para Pix, débito, dinheiro e entradas avulsas.</small></div></div>
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
         <button class="${entryMode === "Receita" ? "active" : ""}" type="button" data-entry-mode="Receita">Entrada</button>
         <button class="${entryMode === "Despesa" ? "active" : ""}" type="button" data-entry-mode="Despesa">Saída</button>
       </div>
       ${input("value", "Valor", "number", editing?.value || "", "0.01", "Valor total da entrada ou saída.")}
       ${input("date", "Data", "date", editing?.date || new Date().toISOString().slice(0, 10), "", "Data em que aconteceu ou deve acontecer.")}
-      ${select("category", isIncome ? "De onde veio?" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, "", "Ajuda o app a organizar o resumo por tipo.")}
+      ${select("category", isIncome ? "De onde veio?" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, editing?.category || "", "Ajuda o app a organizar o resumo por tipo.")}
       ${input("description", isIncome ? "Descrição da entrada" : "Descrição da saída", "text", editing?.description || "", "", "Nome curto para reconhecer depois.")}
       ${select("person", "Quem?", appPeople(), editing?.person, "Quem recebeu, pagou ou é responsável.")}
-      ${!isIncome ? select("payment", "Como foi pago?", state.paymentTypes.filter((item) => item !== "Cartão de Crédito"), "", "Forma de pagamento usada nessa saída.") : ""}
-      ${select("account", isIncome ? "Conta que recebeu" : "Conta de onde saiu", accountOptions(), "", "Conta/carteira onde o dinheiro entrou ou saiu.")}
-      ${!isIncome ? select("status", "Situação", ["Pago", "Pendente"], "", "Pago já saiu da conta. Pendente ainda está para pagar.") : ""}
-      <label class="field span-2"><span>Observação opcional</span><input name="notes"></label>
+      ${!isIncome ? select("payment", "Como foi pago?", state.paymentTypes.filter((item) => item !== "Cartão de Crédito"), editing?.payment || "", "Forma de pagamento usada nessa saída.") : ""}
+      ${select("account", isIncome ? "Conta que recebeu" : "Conta de onde saiu", accountOptions(), editing?.account || "", "Conta/carteira onde o dinheiro entrou ou saiu.")}
+      ${!isIncome ? select("status", "Situação", ["Pago", "Pendente"], editing?.status || "", "Pago já saiu da conta. Pendente ainda está para pagar.") : ""}
+      <label class="field span-2"><span>Observação opcional</span><input name="notes" value="${editing?.notes || ""}"></label>
       <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
       ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
     </form>
-    <div class="panel">
-      <h2>Fixos do mês</h2>
+    <div class="panel soft-panel">
+      <div class="section-title"><span>↻</span><div><h2>Fixos configurados</h2><small>Use isto apenas para gerar receitas/despesas recorrentes antigas.</small></div></div>
       <div class="list">
         ${state.recurring.length ? state.recurring.map((item) => `<div class="list-item"><div><strong>${item.description}</strong><span>${item.type === "Receita" ? "Entrada" : "Saída"} · dia ${item.day} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`).join("") : emptyHtml()}
       </div>
       <button class="ghost" id="generate-recurring" type="button">Gerar fixos deste mês</button>
     </div>
-    <div class="panel">
-      <h2>Filtros</h2>
+    <div class="panel soft-panel">
+      <div class="section-title"><span>☷</span><div><h2>Lançamentos do mês</h2><small>Filtre, edite ou exclua quando precisar.</small></div></div>
       <div class="mode-picker filter-tabs">
         ${["Todos", "Entrada", "Saída", "Pago", "Pendente"].map((filter) => `<button class="${entryFilter === filter ? "active" : ""}" type="button" data-entry-filter="${filter}">${filter}</button>`).join("")}
       </div>
-    </div>
-    ${table(["Data", "Tipo", "Categoria", "Descrição", "Valor", "Quem", "Situação", ""], filteredEntries.map((item) => [
+      ${table(["Data", "Tipo", "Categoria", "Descrição", "Valor", "Quem", "Situação", ""], filteredEntries.map((item) => [
       dateFmt.format(new Date(`${item.date}T00:00:00Z`)),
       pill(item.type === "Receita" ? "Entrada" : "Saída", item.type.toLowerCase()),
       item.category,
@@ -1622,7 +1634,8 @@ function renderEntries() {
       pill(item.person, item.person.toLowerCase()),
       pill(item.status, item.status.toLowerCase()),
       `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
-    ]))}
+      ]))}
+    </div>
   `;
   qs("#entry-form").addEventListener("submit", addEntry);
   qs("#generate-recurring").addEventListener("click", generateRecurring);
@@ -1656,13 +1669,16 @@ function filterEntries(entries) {
 }
 
 function generateRecurring() {
-  const year = new Date().getFullYear();
-  const month = new Date().getMonth();
-  const monthName = months[month];
+  const year = Number(state.selectedYear || new Date().getFullYear());
+  const month = monthIndex(state.selectedMonth);
+  const monthName = state.selectedMonth;
   let created = 0;
   state.recurring.forEach((item) => {
     const date = new Date(year, month, Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
-    const exists = state.entries.some((entry) => entry.recurringId === item.id && entry.month === monthName);
+    const exists = state.entries.some((entry) => {
+      const entryDate = new Date(`${entry.date}T00:00:00Z`);
+      return entry.recurringId === item.id && entry.month === monthName && entryDate.getUTCFullYear() === year;
+    });
     if (exists) return;
     state.entries.unshift({
       id: crypto.randomUUID(),
@@ -1681,7 +1697,7 @@ function generateRecurring() {
     });
     created += 1;
   });
-  notify("sync", `${created} fixos gerados para ${monthName}`);
+  notify("sync", `${created} fixos gerados para ${monthName}/${year}`);
   commitState();
 }
 
@@ -1845,13 +1861,25 @@ function statementRow(item) {
 }
 
 function renderFixedBills() {
+  const fixedInfo = fixedBillsWithDueInfo();
+  const paidFixed = total(fixedInfo.filter((item) => isFixedPaid(item)));
+  const pendingFixed = total(fixedInfo.filter((item) => !isFixedPaid(item)));
+  const cardFixed = total((state.cardRecurring || []).filter((item) => item.active !== false).map((item) => ({ value: item.value })));
   qs("#fixed").innerHTML = `
-    <div class="panel helper-panel">
-      <h2>Despesas fixas</h2>
-      <p>Aba exclusiva para despesas recorrentes: contas fora do cartão e cobranças mensais que caem na fatura.</p>
-    </div>
+    <section class="feature-hero fixed-hero">
+      <div>
+        <span>Todo mês</span>
+        <h2>Despesas fixas</h2>
+        <p>Contas recorrentes e assinaturas no cartão, com controle de pago ou pendente.</p>
+      </div>
+      <div class="feature-stats">
+        <div><span>Pagas</span><strong>${formatMoney(paidFixed)}</strong></div>
+        <div><span>Pendentes</span><strong>${formatMoney(pendingFixed)}</strong></div>
+        <div><span>No cartão</span><strong>${formatMoney(cardFixed)}</strong></div>
+      </div>
+    </section>
     <form class="settings-form" id="fixed-form">
-      <div class="span-3"><h2>Adicionar despesa fixa</h2></div>
+      <div class="span-3 form-heading"><span>◷</span><div><h2>Adicionar despesa fixa</h2><small>Para aluguel, internet, energia, empréstimos e mensalidades fora do cartão.</small></div></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
       ${input("value", "Valor", "number", "0", "0.01", "Valor mensal dessa conta.")}
       ${input("dueDay", "Vencimento", "number", "10", "1", "Dia do mês em que vence.")}
@@ -1860,11 +1888,14 @@ function renderFixedBills() {
       ${select("status", "Status", ["Pendente", "Pago"], "Pendente", "Pago entra no cálculo do saldo. Pendente aparece em atenção.")}
       <button class="primary form-submit" type="submit">Salvar despesa fixa</button>
     </form>
-    <div class="wallet-list">
-      ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
+    <div class="panel soft-panel">
+      <div class="section-title"><span>☑</span><div><h2>Contas do mês</h2><small>Marque como pago ou volte para pendente se selecionou errado.</small></div></div>
+      <div class="wallet-list">
+        ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
+      </div>
     </div>
     <form class="settings-form" id="card-recurring-form">
-      <div class="span-3"><h2>Adicionar fixo no cartão</h2></div>
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Adicionar fixo no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -1872,8 +1903,11 @@ function renderFixedBills() {
       ${input("day", "Dia da cobrança", "number", "10", "1", "Dia aproximado em que aparece na fatura.")}
       <button class="primary form-submit" type="submit">Salvar fixo no cartão</button>
     </form>
-    <div class="wallet-list">
-      ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
+    <div class="panel soft-panel">
+      <div class="section-title"><span>↻</span><div><h2>Fixos cobrados no cartão</h2><small>Entram na fatura do mês e podem ser marcados como pagos.</small></div></div>
+      <div class="wallet-list">
+        ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
+      </div>
     </div>
   `;
   qs("#fixed-form").addEventListener("submit", addFixedBill);
@@ -1982,13 +2016,25 @@ function editFixedBill(id) {
 
 function renderCards() {
   const cardTableRows = state.installments.slice(0, 8);
+  const summary = currentSummary();
+  const cardLimit = total(state.cards.map((card) => ({ value: card.limit })));
+  const cardUsed = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
+  const cardAvailable = cardLimit - cardUsed;
   qs("#cards").innerHTML = `
-    <div class="panel helper-panel">
-      <h2>Compras no cartão</h2>
-      <p>Faturas, parcelas e assinaturas em um só lugar.</p>
-    </div>
+    <section class="feature-hero cards-hero">
+      <div>
+        <span>Crédito organizado</span>
+        <h2>Cartões e faturas</h2>
+        <p>Compras parceladas, limite disponível, fatura do mês e fixos do cartão em um lugar só.</p>
+      </div>
+      <div class="feature-stats">
+        <div><span>Fatura mês</span><strong>${formatMoney(summary.cardMonth)}</strong></div>
+        <div><span>Limite livre</span><strong>${formatMoney(cardAvailable)}</strong></div>
+        <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
+      </div>
+    </section>
     <form class="entry-form" id="card-form">
-      <div class="span-3 form-heading"><span>+</span><h2>Compra no crédito</h2></div>
+      <div class="span-3 form-heading"><span>+</span><div><h2>Compra no crédito</h2><small>Informe o valor total e o app divide as parcelas na fatura.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada.")}
       ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
       ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
@@ -1998,16 +2044,19 @@ function renderCards() {
       ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Adicionar</button>
     </form>
-    <div class="grid-3">
-      ${state.cards.map(cardSummary).join("") || emptyHtml()}
+    <div class="panel soft-panel">
+      <div class="section-title"><span>▣</span><div><h2>Meus cartões</h2><small>Limite, vencimento, fechamento e fatura atual.</small></div></div>
+      <div class="grid-3 card-grid">
+        ${state.cards.map(cardSummary).join("") || emptyHtml()}
+      </div>
     </div>
-    <div class="panel">
+    <div class="panel soft-panel">
       <div class="section-title"><span>▣</span><div><h2>Faturas (${state.selectedMonth})</h2></div></div>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
-    <div class="panel">
+    <div class="panel soft-panel">
       <div class="section-title"><span>☷</span><div><h2>Compras recentes</h2></div></div>
       ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], cardTableRows.map((item) => [
         item.description,
