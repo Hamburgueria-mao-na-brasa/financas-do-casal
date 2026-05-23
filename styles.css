@@ -119,6 +119,10 @@ body.app-ready .app-frame {
   display: block;
 }
 
+body.auth-locked .app-frame {
+  display: none !important;
+}
+
 body.app-ready .auth-screen {
   display: none;
 }
@@ -3404,10 +3408,14 @@ button.list-item {
   }
 
   .show-password {
+    width: 68px;
+    min-width: 68px;
     min-height: 58px;
+    padding: 0;
     color: #071b1b;
     background: linear-gradient(135deg, #13d8ff, #2563ff);
     border-left: 0;
+    border-radius: 0;
   }
 
   .primary,
@@ -3570,6 +3578,16 @@ button.list-item {
 
   .auth-card {
     align-self: center;
+    border-radius: 22px;
+  }
+
+  .auth-card .field input {
+    min-height: 58px;
+  }
+
+  .password-wrap {
+    grid-template-columns: minmax(0, 1fr) 68px;
+    border-radius: 18px;
   }
 
   .auth-card h1 {
@@ -3588,20 +3606,50 @@ button.list-item {
   }
 
   .login-hero {
-    min-height: 250px;
-    padding: 22px;
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .login-hero .brand {
+    margin-bottom: 14px;
+  }
+
+  .login-hero-copy {
+    gap: 6px;
   }
 
   .login-hero-copy strong {
-    font-size: 34px;
+    max-width: 100%;
+    font-size: 25px;
+    line-height: 1.04;
+  }
+
+  .login-hero-copy small {
+    font-size: 13px;
   }
 
   .login-preview-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .login-preview-grid div {
+    min-height: 64px;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .login-preview-grid span {
+    font-size: 10px;
+  }
+
+  .login-preview-grid strong {
+    font-size: 13px;
   }
 
   .auth-copy {
-    padding: 22px 22px 10px;
+    padding: 18px 22px 8px;
   }
 
   .auth-secondary-actions {
