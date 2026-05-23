@@ -1869,7 +1869,7 @@ function renderFixedBills() {
     <section class="feature-hero fixed-hero">
       <div>
         <span>Todo mês</span>
-        <h2>Despesas fixas</h2>
+        <h2>Controle mensal</h2>
         <p>Contas recorrentes e assinaturas no cartão, com controle de pago ou pendente.</p>
       </div>
       <div class="feature-stats">
@@ -1879,7 +1879,7 @@ function renderFixedBills() {
       </div>
     </section>
     <form class="settings-form" id="fixed-form">
-      <div class="span-3 form-heading"><span>◷</span><div><h2>Adicionar despesa fixa</h2><small>Para aluguel, internet, energia, empréstimos e mensalidades fora do cartão.</small></div></div>
+      <div class="span-3 form-heading"><span>◷</span><div><h2>Nova conta fixa</h2><small>Para aluguel, internet, energia, empréstimos e mensalidades fora do cartão.</small></div></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
       ${input("value", "Valor", "number", "0", "0.01", "Valor mensal dessa conta.")}
       ${input("dueDay", "Vencimento", "number", "10", "1", "Dia do mês em que vence.")}
@@ -1895,7 +1895,7 @@ function renderFixedBills() {
       </div>
     </div>
     <form class="settings-form" id="card-recurring-form">
-      <div class="span-3 form-heading"><span>▣</span><div><h2>Adicionar fixo no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Nova assinatura no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -1904,7 +1904,7 @@ function renderFixedBills() {
       <button class="primary form-submit" type="submit">Salvar fixo no cartão</button>
     </form>
     <div class="panel soft-panel">
-      <div class="section-title"><span>↻</span><div><h2>Fixos cobrados no cartão</h2><small>Entram na fatura do mês e podem ser marcados como pagos.</small></div></div>
+      <div class="section-title"><span>↻</span><div><h2>Assinaturas no cartão</h2><small>Entram na fatura do mês e podem ser marcadas como pagas.</small></div></div>
       <div class="wallet-list">
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
@@ -2487,16 +2487,6 @@ function renderSettings() {
         ${input("name", "Nova categoria", "text", "")}
         <button class="primary" type="submit">Adicionar</button>
       </form>
-      <form class="settings-form" id="recurring-form">
-        <div class="span-3"><h2>Receitas e despesas fixas</h2></div>
-        ${select("type", "Tipo", ["Despesa", "Receita"])}
-        ${input("description", "Descrição", "text", "")}
-        ${input("value", "Valor", "number", "0", "0.01")}
-        ${input("day", "Dia do mês", "number", "1", "1")}
-        ${select("category", "Categoria", [...state.categoriesExpense, ...state.categoriesIncome])}
-        ${select("person", "Quem?", appPeople())}
-        <button class="primary form-submit" type="submit">Salvar fixo</button>
-      </form>
       <form class="settings-form" id="budget-form">
         <div class="span-3"><h2>Orçamento por categoria</h2></div>
         ${select("category", "Categoria", state.categoriesExpense)}
@@ -2542,7 +2532,6 @@ function renderSettings() {
   `;
   qs("#profile-form").addEventListener("submit", saveProfile);
   qs("#category-form").addEventListener("submit", addCategory);
-  qs("#recurring-form").addEventListener("submit", addRecurring);
   qs("#budget-form").addEventListener("submit", saveBudget);
   qs("#export-data").addEventListener("click", exportData);
   qs("#import-data").addEventListener("change", importData);
