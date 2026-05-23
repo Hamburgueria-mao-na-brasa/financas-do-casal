@@ -3091,24 +3091,29 @@ button.list-item {
   }
 
   .more-grid {
-    margin: 0 28px;
+    margin: 0 20px;
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .more-hero {
     grid-template-columns: 1fr;
     min-height: 0;
-    margin: 0 28px;
-    padding: 22px;
-    border-radius: 28px;
+    margin: 0 20px;
+    padding: 18px;
+    border-radius: 22px;
   }
 
   .more-hero h2 {
-    font-size: 28px;
+    font-size: 24px;
+  }
+
+  .more-hero p {
+    font-size: 13px;
   }
 
   .more-hero-balance {
-    min-width: 0;
+    display: none;
   }
 
   .logout-card-top {
@@ -3117,10 +3122,21 @@ button.list-item {
   }
 
   .more-card {
-    min-height: 86px;
+    min-height: 74px;
+    grid-template-columns: 42px 1fr;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 18px;
     color: #f2fff9;
     background: rgba(255, 255, 255, .07);
     border-color: rgba(183, 255, 238, .14);
+  }
+
+  .more-card b {
+    width: 42px;
+    height: 42px;
+    border-radius: 15px;
+    font-size: 18px;
   }
 
   .more-card small {
@@ -3629,23 +3645,7 @@ button.list-item {
   }
 
   .login-preview-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    margin-top: 14px;
-  }
-
-  .login-preview-grid div {
-    min-height: 64px;
-    padding: 10px;
-    border-radius: 16px;
-  }
-
-  .login-preview-grid span {
-    font-size: 10px;
-  }
-
-  .login-preview-grid strong {
-    font-size: 13px;
+    display: none;
   }
 
   .auth-copy {
@@ -3733,9 +3733,9 @@ button.list-item {
   }
 
   body.app-ready .balance-card {
-    min-height: 260px;
+    min-height: 236px;
     display: block;
-    padding: 22px;
+    padding: 20px;
     border-radius: 24px;
   }
 
@@ -3757,18 +3757,18 @@ button.list-item {
   }
 
   body.app-ready .mood-message {
-    max-width: 235px;
+    max-width: 220px;
     margin-top: 12px;
-    font-size: 19px;
+    font-size: 17px;
     line-height: 1.25;
   }
 
   body.app-ready .couple-widget {
-    width: 92px;
+    width: 82px;
     min-width: 0;
     position: absolute;
-    right: 22px;
-    bottom: 48px;
+    right: 20px;
+    bottom: 52px;
   }
 
   body.app-ready .balance-ring {
