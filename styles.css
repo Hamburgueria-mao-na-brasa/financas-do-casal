@@ -2578,6 +2578,40 @@ button.list-item {
   align-content: start;
 }
 
+.dashboard-invoices {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-invoice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-invoice-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(19, 216, 255, .16), transparent 30%),
+    rgba(255, 255, 255, .06);
+}
+
+.dashboard-invoice-card span,
+.dashboard-invoice-card small {
+  display: block;
+  color: var(--muted);
+}
+
+.dashboard-invoice-card strong {
+  display: block;
+  margin: 6px 0 5px;
+  font-size: 28px;
+}
+
 .list-item:hover {
   border-color: rgba(0, 168, 107, .38);
   transform: translateX(2px);
@@ -3838,6 +3872,25 @@ button.list-item {
   body.app-ready .feature-hero {
     margin-left: 20px;
     margin-right: 20px;
+  }
+
+  body.app-ready .dashboard-invoices {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+
+  body.app-ready .dashboard-invoice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-ready .dashboard-invoice-card {
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(183, 255, 238, .14);
+  }
+
+  body.app-ready .dashboard-invoice-card strong {
+    font-size: 24px;
   }
 
   body.app-ready .statement-list.panel,

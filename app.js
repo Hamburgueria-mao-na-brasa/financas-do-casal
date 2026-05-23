@@ -1371,6 +1371,7 @@ function renderDashboard() {
       ${metric("Cartões", summary.cardMonth, "info")}
       ${metric("Metas", summary.goalsSaved, "good")}
     </div>
+    ${dashboardInvoicesHtml()}
     <div class="grid-2">
       <div class="panel dashboard-priority">
         <div class="section-title">
@@ -1386,6 +1387,41 @@ function renderDashboard() {
         ${donutChart(chartData)}
       </div>
     </div>
+  `;
+}
+
+function dashboardInvoicesHtml() {
+  if (!state.cards.length) return "";
+  const invoices = state.cards
+    .map((card) => ({ card, summary: cardStatementSummary(card) }))
+    .filter((item) => item.summary.invoiceTotal > 0 || item.summary.open > 0);
+  return `
+    <div class="panel dashboard-invoices">
+      <div class="section-title">
+        <span>▣</span>
+        <div><h2>Faturas do mês</h2><small>Valor atual dos cartões em ${state.selectedMonth}/${state.selectedYear}.</small></div>
+      </div>
+      <div class="dashboard-invoice-grid">
+        ${invoices.length ? invoices.map(dashboardInvoiceCard).join("") : `<div class="empty"><strong>Nenhuma fatura no mês</strong><span>Compras no cartão aparecem aqui quando forem lançadas.</span></div>`}
+      </div>
+    </div>
+  `;
+}
+
+function dashboardInvoiceCard({ card, summary }) {
+  const open = summary.open;
+  return `
+    <article class="dashboard-invoice-card">
+      <div>
+        <span>${card.name}</span>
+        <strong>${formatMoney(open)}</strong>
+        <small>Atual ${formatMoney(summary.invoiceTotal)} · vence dia ${card.dueDay || 10}</small>
+      </div>
+      <div class="card-actions">
+        <button class="tiny ghost" type="button" data-view="cards">Ver</button>
+        ${open > 0 ? `<button class="tiny ghost" type="button" data-partial-card-payment="${card.name}">Pagar parcial</button><button class="tiny ghost" type="button" data-pay-card-month="${card.name}">Quitar</button>` : `<button class="tiny ghost" type="button" data-reopen-card-month="${card.name}">Reabrir</button>`}
+      </div>
+    </article>
   `;
 }
 
