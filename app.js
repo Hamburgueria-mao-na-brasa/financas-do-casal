@@ -17,7 +17,7 @@ const seed = {
   methodIncome: 0,
   goals: [],
   notifications: [],
-  profile: { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 },
+  profile: { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0, salaryDayOne: 5, salaryDayTwo: 5 },
   onboardingDone: false,
   tutorialDone: false,
   privacyMode: false,
@@ -90,6 +90,8 @@ function ensureStateShape() {
   state.profile ||= { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 };
   state.profile.salaryOne ||= 0;
   state.profile.salaryTwo ||= 0;
+  state.profile.salaryDayOne = Number(state.profile.salaryDayOne || 5);
+  state.profile.salaryDayTwo = Number(state.profile.salaryDayTwo || 5);
   state.recurring ||= [];
   state.budgets ||= {};
   state.notificationMarks ||= {};
@@ -168,6 +170,34 @@ function isFixedPaid(item, month = state.selectedMonth) {
   return (item.paidMonths || []).includes(month);
 }
 
+function salaryPlannedTotal() {
+  return Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+}
+
+function isSalaryAvailable(day, month = state.selectedMonth) {
+  const now = new Date();
+  const selectedIndex = monthIndex(month);
+  if (selectedIndex < now.getMonth()) return true;
+  if (selectedIndex > now.getMonth()) return false;
+  return now.getDate() >= Number(day || 1);
+}
+
+function availableSalaryTotal(month = state.selectedMonth) {
+  const one = isSalaryAvailable(state.profile.salaryDayOne, month) ? Number(state.profile.salaryOne || 0) : 0;
+  const two = isSalaryAvailable(state.profile.salaryDayTwo, month) ? Number(state.profile.salaryTwo || 0) : 0;
+  return one + two;
+}
+
+function nextSalaryText() {
+  const salaries = [
+    { name: state.profile.personOne || "Primeira pessoa", value: Number(state.profile.salaryOne || 0), day: Number(state.profile.salaryDayOne || 5) },
+    { name: state.profile.personTwo || "Segunda pessoa", value: Number(state.profile.salaryTwo || 0), day: Number(state.profile.salaryDayTwo || 5) }
+  ].filter((item) => item.value > 0 && !isSalaryAvailable(item.day));
+  if (!salaries.length) return "Salários disponíveis";
+  const next = salaries.sort((a, b) => a.day - b.day)[0];
+  return `${next.name}: dia ${next.day}`;
+}
+
 function currentSummary() {
   const entries = byMonth(state.entries);
   const income = total(entries.filter((item) => item.type === "Receita"));
@@ -176,9 +206,10 @@ function currentSummary() {
   const cardDebt = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
   const fixedPaid = total((state.fixedBills || []).filter((item) => isFixedPaid(item)));
   const fixedPending = total((state.fixedBills || []).filter((item) => !isFixedPaid(item)));
-  const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+  const salaryTotal = availableSalaryTotal();
+  const salaryPlanned = salaryPlannedTotal();
   const goalsSaved = total((state.goals || []).map((goal) => ({ value: goal.saved })));
-  return { income, expense, cardMonth, cardDebt, fixedPaid, fixedPending, salaryTotal, goalsSaved, balance: income + salaryTotal - expense - fixedPaid - cardMonth };
+  return { income, expense, cardMonth, cardDebt, fixedPaid, fixedPending, salaryTotal, salaryPlanned, goalsSaved, balance: income + salaryTotal - expense - fixedPaid - cardMonth };
 }
 
 function pageTitle(view) {
@@ -1038,6 +1069,12 @@ function renderMonthFilter() {
 
 function ensureMoreNavigation() {
   const tabs = qs(".tabs");
+  const fixedTab = qs('[data-view="fixed"]', tabs);
+  if (fixedTab) {
+    fixedTab.title = "Despesas Fixas";
+    const label = qs("span", fixedTab);
+    if (label) label.textContent = "Despesas Fixas";
+  }
   if (tabs && !qs('[data-view="more"]', tabs)) {
     tabs.insertAdjacentHTML("beforeend", `<button class="tab tab-more" data-view="more" title="Mais">☰ <span>Mais</span></button>`);
   }
@@ -1088,6 +1125,7 @@ function renderDashboard() {
       ${metric("Próxima conta", forecast.nextBill?.value || 0, forecast.nextBill ? "warn" : "good")}
       ${metric("Fatura atual", summary.cardMonth, "info")}
       ${metric("Meta guardada", summary.goalsSaved, "good")}
+      ${metric("Salário disponível", summary.salaryTotal, "good")}
     </div>
     <div class="grid-2">
       <div class="panel today-panel">
@@ -1097,6 +1135,7 @@ function renderDashboard() {
           <div><span>Saiu</span><strong>${formatMoney(today.expense)}</strong></div>
           <div><span>Vence hoje</span><strong>${today.dueToday}</strong></div>
           <div><span>Atrasadas</span><strong>${today.overdue}</strong></div>
+          <div><span>Próximo salário</span><strong>${nextSalaryText()}</strong></div>
         </div>
         <button class="ghost" type="button" data-view="agenda">Ver agenda</button>
       </div>
@@ -1788,7 +1827,7 @@ function renderFixedBills() {
   qs("#fixed").innerHTML = `
     <div class="panel helper-panel">
       <h2>Despesas fixas</h2>
-      <p>Aba exclusiva para aluguel, água, energia, internet, financiamentos, empréstimos e contas mensais fora do cartão.</p>
+      <p>Aba exclusiva para despesas recorrentes: contas fora do cartão e cobranças mensais que caem na fatura.</p>
     </div>
     <form class="settings-form" id="fixed-form">
       <div class="span-3"><h2>Adicionar despesa fixa</h2></div>
@@ -1803,8 +1842,21 @@ function renderFixedBills() {
     <div class="wallet-list">
       ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
     </div>
+    <form class="settings-form" id="card-recurring-form">
+      <div class="span-3"><h2>Adicionar fixo no cartão</h2></div>
+      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
+      ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
+      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
+      ${input("value", "Valor mensal", "number", "", "0.01", "Valor cobrado todo mês.")}
+      ${input("day", "Dia da cobrança", "number", "10", "1", "Dia aproximado em que aparece na fatura.")}
+      <button class="primary form-submit" type="submit">Salvar fixo no cartão</button>
+    </form>
+    <div class="wallet-list">
+      ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
+    </div>
   `;
   qs("#fixed-form").addEventListener("submit", addFixedBill);
+  qs("#card-recurring-form").addEventListener("submit", addCardRecurring);
 }
 
 function renderAgenda() {
@@ -1925,15 +1977,6 @@ function renderCards() {
       ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Adicionar</button>
     </form>
-    <form class="entry-form" id="card-recurring-form">
-      <div class="span-3 form-heading"><span>↻</span><h2>Fixo mensal no cartão</h2></div>
-      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
-      ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
-      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
-      ${input("value", "Valor mensal", "number", "", "0.01", "Valor cobrado todo mês.")}
-      ${input("day", "Dia da cobrança", "number", "10", "1", "Dia aproximado em que aparece na fatura.")}
-      <button class="primary" type="submit">Salvar fixo</button>
-    </form>
     <div class="grid-3">
       ${state.cards.map(cardSummary).join("") || emptyHtml()}
     </div>
@@ -1941,12 +1984,6 @@ function renderCards() {
       <div class="section-title"><span>▣</span><div><h2>Faturas (${state.selectedMonth})</h2></div></div>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
-      </div>
-    </div>
-    <div class="panel">
-      <div class="section-title"><span>↻</span><div><h2>Fixos no cartão</h2></div></div>
-      <div class="list">
-        ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
     </div>
     <div class="panel">
@@ -1961,7 +1998,6 @@ function renderCards() {
     </div>
   `;
   qs("#card-form").addEventListener("submit", addInstallment);
-  qs("#card-recurring-form").addEventListener("submit", addCardRecurring);
 }
 
 function cardRecurringRow(item) {
@@ -2245,7 +2281,7 @@ function addIncome(event) {
 }
 
 function renderMethod() {
-  const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
+  const salaryTotal = salaryPlannedTotal();
   const income = salaryTotal || Number(state.methodIncome || 0);
   const rows = [
     ["50%", "Necessidades", income * .5, "#1677ff"],
@@ -2359,8 +2395,10 @@ function renderSettings() {
       </div>
       ${input("personOne", "Primeira pessoa", "text", state.profile.personOne || "Ele", "", "Nome que aparece nos lançamentos e relatórios.")}
       ${input("salaryOne", "Salário da primeira pessoa", "number", state.profile.salaryOne || 0, "0.01", "Renda mensal usada no dashboard e no 50/30/20.")}
+      ${input("salaryDayOne", "Dia que cai", "number", state.profile.salaryDayOne || 5, "1", "O salário só entra no saldo depois desse dia.")}
       ${input("personTwo", "Segunda pessoa", "text", state.profile.personTwo || "Ela", "", "Nome que aparece nos lançamentos e relatórios.")}
       ${input("salaryTwo", "Salário da segunda pessoa", "number", state.profile.salaryTwo || 0, "0.01", "Renda mensal usada no dashboard e no 50/30/20.")}
+      ${input("salaryDayTwo", "Dia que cai", "number", state.profile.salaryDayTwo || 5, "1", "O salário só entra no saldo depois desse dia.")}
       <button class="primary form-submit" type="submit">Salvar perfil</button>
     </form>
     <div class="grid-2">
@@ -2540,7 +2578,9 @@ function saveProfile(event) {
     personOne: data.personOne,
     personTwo: data.personTwo,
     salaryOne: Number(data.salaryOne || 0),
-    salaryTwo: Number(data.salaryTwo || 0)
+    salaryTwo: Number(data.salaryTwo || 0),
+    salaryDayOne: Number(data.salaryDayOne || 5),
+    salaryDayTwo: Number(data.salaryDayTwo || 5)
   };
   notify("sync", "Perfil do casal atualizado");
   commitState();
