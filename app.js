@@ -321,6 +321,7 @@ function renderGate(message = "") {
     setAppReady(false);
     const isSignup = authMode === "signup";
     const isForgot = authMode === "forgot";
+    const rememberedEmail = localStorage.getItem("duofinLoginEmail") || "";
     const title = isForgot ? "Recupere seu acesso" : isSignup ? "Comece do zero" : "Entre no DuoFin";
     const subtitle = isForgot
       ? "Enviamos um link seguro para você definir uma nova senha."
@@ -350,15 +351,16 @@ function renderGate(message = "") {
           <p>${subtitle}</p>
         </div>
         <form id="login-form" class="auth-actions">
-          <label class="field"><span>E-mail</span><input name="email" type="email" placeholder="voce@email.com" required></label>
-          ${isForgot ? "" : passwordField("Senha")}
+          <label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="email" inputmode="email" placeholder="voce@email.com" value="${rememberedEmail}" required></label>
+          ${isForgot ? "" : passwordField("Senha", isSignup ? "new-password" : "current-password")}
+          ${isForgot ? "" : `<label class="remember-login"><input name="rememberEmail" type="checkbox" ${rememberedEmail ? "checked" : ""}> <span>Lembrar meu e-mail neste aparelho</span></label>`}
           <button class="primary" type="submit">${isForgot ? "Enviar link para senha" : isSignup ? "Criar conta" : "Entrar"}</button>
           <div class="auth-secondary-actions">
             ${isForgot ? `<button class="ghost" id="toggle-auth" type="button">Voltar para entrar</button>` : `<button class="ghost" id="toggle-auth" type="button">${isSignup ? "Já tenho conta" : "Criar conta nova"}</button>`}
-            ${isSignup || isForgot ? "" : `<button class="ghost" id="forgot-password" type="button">Recuperar senha</button>`}
+            ${isSignup || isForgot ? "" : `<button class="ghost recovery-link" id="forgot-password" type="button">Esqueci minha senha</button>`}
           </div>
         </form>
-        <div class="auth-safe-note"><b>✓</b><span>Se o app ficar fechado por 5 minutos, o login é pedido novamente.</span></div>
+        <div class="auth-safe-note"><b>✓</b><span>O Chrome pode guardar sua senha com segurança. O DuoFin guarda só seu e-mail, se você quiser.</span></div>
         ${message ? `<p class="mini-status">${message}</p>` : ""}
       </div>
     `;
@@ -369,6 +371,8 @@ function renderGate(message = "") {
     });
     const forgot = qs("#forgot-password");
     if (forgot) forgot.addEventListener("click", () => {
+      const typedEmail = qs("#login-form input[name='email']")?.value?.trim();
+      if (typedEmail) localStorage.setItem("duofinLoginEmail", typedEmail);
       authMode = "forgot";
       renderGate();
     });
@@ -407,9 +411,14 @@ function renderGate(message = "") {
         </div>
         ${invite ? `
           <h1>Confirmar convite</h1>
-          <p>Você foi convidado para compartilhar as finanças do casal. Confirme para entrar no mesmo cofre.</p>
+          <p>Você foi convidado para compartilhar as finanças do casal. Ao aceitar, esta conta verá e poderá alterar os mesmos dados do cofre.</p>
+          <div class="invite-alert">
+            <strong>Cuidado antes de aceitar</strong>
+            <span>Use este convite apenas com a pessoa que deve participar do controle financeiro.</span>
+          </div>
           <div class="auth-actions">
             <button class="primary" id="accept-invite" type="button">Aceitar convite</button>
+            <button class="ghost" id="ignore-invite" type="button">Ignorar convite e abrir minha conta</button>
             <button class="ghost" id="logout" type="button">Usar outro e-mail</button>
           </div>
         ` : `
@@ -429,6 +438,11 @@ function renderGate(message = "") {
     if (logout) logout.addEventListener("click", signOut);
     const accept = qs("#accept-invite");
     if (accept) accept.addEventListener("click", () => joinHousehold(invite));
+    const ignoreInvite = qs("#ignore-invite");
+    if (ignoreInvite) ignoreInvite.addEventListener("click", () => {
+      history.replaceState({}, "", location.pathname);
+      loadExistingHousehold(true);
+    });
     const manualInvite = qs("#manual-invite-form");
     if (manualInvite) manualInvite.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -872,6 +886,34 @@ async function copyInviteLink() {
   }
 }
 
+async function rotateInviteCode() {
+  if (!cloudReady || !householdId) return;
+  const ok = confirm("Gerar um novo código? O código antigo deixa de funcionar para novos convites.");
+  if (!ok) return;
+  const nextCode = makeInviteCode();
+  let { data, error } = await cloud.rpc("rotate_household_invite", { new_code: nextCode });
+  if (error) {
+    const fallback = await cloud
+      .from("households")
+      .update({ invite_code: nextCode })
+      .eq("id", householdId)
+      .select("invite_code")
+      .single();
+    data = fallback.data?.invite_code;
+    error = fallback.error;
+  }
+  if (error) {
+    showToast("Não deu para trocar o código. Atualize o SQL do Supabase e tente de novo.", "error");
+    return;
+  }
+  householdInviteCode = data || nextCode;
+  inviteCodeVisible = true;
+  localStorage.setItem("coupleFinanceInviteCode", householdInviteCode);
+  notify("invite", "Novo código de convite gerado");
+  await commitState();
+  renderSettings();
+}
+
 function promptJoinHousehold() {
   const code = prompt("Cole aqui o código de convite do cofre compartilhado:", "");
   if (!code) return;
@@ -892,7 +934,9 @@ function showJoinError(message) {
 async function handlePasswordAuth(event) {
   event.preventDefault();
   const form = new FormData(event.target);
-  const email = form.get("email");
+  const email = String(form.get("email") || "").trim();
+  if (form.get("rememberEmail") || authMode === "forgot") localStorage.setItem("duofinLoginEmail", email);
+  else localStorage.removeItem("duofinLoginEmail");
   if (authMode === "forgot") {
     const { error } = await cloud.auth.resetPasswordForEmail(email, {
       redirectTo: location.href.split("#")[0]
@@ -1004,7 +1048,13 @@ async function joinHousehold(code) {
   render();
 }
 
-async function loadExistingHousehold() {
+async function loadExistingHousehold(ignoreInvite = false) {
+  if (getInviteParam() && !ignoreInvite) {
+    cloudReady = false;
+    renderGate("Confirme o convite antes de abrir qualquer dado.");
+    return;
+  }
+
   const storedHouseholdId = localStorage.getItem("coupleFinanceHouseholdId");
   if (storedHouseholdId) {
     householdId = storedHouseholdId;
@@ -2680,7 +2730,11 @@ function renderSettings() {
               <div><strong>Código do cofre</strong><span>${inviteCodeVisible ? inviteCode : "••••••••••"}</span></div>
               <button class="tiny ghost" id="toggle-invite-code" type="button">${inviteCodeVisible ? "Ocultar" : "Mostrar"}</button>
             </div>
+            <div class="list-item invite-warning">
+              <div><strong>Convite compartilhado</strong><span>Quem entrar com este código participa do mesmo cofre e verá os mesmos dados financeiros.</span></div>
+            </div>
             ${inviteCodeVisible ? `<button class="ghost" id="copy-invite" type="button">Copiar código</button>` : ""}
+            <button class="ghost" id="rotate-invite-code" type="button">Gerar novo código</button>
           ` : ""}
           <button class="ghost" id="join-by-code" type="button">Entrar com código de outro cofre</button>
           <button class="ghost" id="logout" type="button">Sair da conta</button>
@@ -2701,6 +2755,8 @@ function renderSettings() {
   });
   const copyInvite = qs("#copy-invite");
   if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
+  const rotateInvite = qs("#rotate-invite-code");
+  if (rotateInvite) rotateInvite.addEventListener("click", rotateInviteCode);
   qs("#join-by-code").addEventListener("click", promptJoinHousehold);
   qs("#logout").addEventListener("click", signOut);
   qs("#reset-data").addEventListener("click", resetData);
@@ -2871,12 +2927,12 @@ function labelWithHelp(label, help = "") {
   return `${label}${help ? `<button class="help-dot" type="button" title="${help}" aria-label="${help}">?</button>` : ""}`;
 }
 
-function passwordField(label) {
+function passwordField(label, autocomplete = "current-password") {
   return `
     <label class="field">
       <span>${label}</span>
       <div class="password-wrap">
-        <input name="password" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required>
+        <input name="password" type="password" minlength="6" autocomplete="${autocomplete}" placeholder="Mínimo 6 caracteres" required>
         <button class="show-password" type="button" data-toggle-password>Ver</button>
       </div>
     </label>
