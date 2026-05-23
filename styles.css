@@ -601,6 +601,11 @@ h2 {
   line-height: 1.45;
 }
 
+.member-row {
+  border-color: rgba(19, 216, 255, .28);
+  background: rgba(19, 216, 255, .08);
+}
+
 .notif-button {
   width: 42px;
   height: 42px;

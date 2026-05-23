@@ -31,6 +31,7 @@ let state = loadState();
 let currentUser = null;
 let householdId = localStorage.getItem("coupleFinanceHouseholdId");
 let householdInviteCode = localStorage.getItem("coupleFinanceInviteCode");
+let householdMembers = [];
 let cloudReady = false;
 let saveTimer = null;
 let loadingCloud = false;
@@ -63,6 +64,7 @@ const tutorialSteps = [
   ["Metas", "Acompanhe objetivos do casal e edite valor guardado ou valor total quando precisar."],
   ["Cadastros", "Ajuste nomes, salários, categorias, recorrências, orçamento e backup."]
 ];
+const tutorialViews = ["dashboard", "entries", "fixed", "accounts", "cards", "method", "goals", "settings"];
 
 const qs = (selector, root = document) => root.querySelector(selector);
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -308,6 +310,12 @@ function getInviteLink() {
 function setAppReady(ready) {
   document.body.classList.toggle("app-ready", ready);
   document.body.classList.toggle("auth-locked", !ready);
+}
+
+function memberDisplayName(member) {
+  if (member.user_id === currentUser?.id) return "Você";
+  if (member.role === "owner") return "Administrador";
+  return "Parceiro";
 }
 
 function renderGate(message = "") {
@@ -622,6 +630,7 @@ function renderTutorial() {
       </div>
       <div class="tutorial-actions">
         <button class="ghost" id="prev-tutorial" type="button" ${tutorialStep === 0 ? "disabled" : ""}>Voltar</button>
+        <button class="ghost" id="open-tutorial-view" type="button">Abrir esta aba</button>
         <button class="primary" id="next-tutorial" type="button">${tutorialStep === tutorialSteps.length - 1 ? "Concluir" : "Próximo"}</button>
       </div>
     </div>
@@ -637,6 +646,11 @@ function renderTutorial() {
       tutorialStep += 1;
       renderTutorial();
     }
+  });
+  qs("#open-tutorial-view").addEventListener("click", () => {
+    const target = tutorialViews[tutorialStep] || "dashboard";
+    finishTutorial();
+    setActiveView(target);
   });
 }
 
@@ -914,6 +928,36 @@ async function rotateInviteCode() {
   renderSettings();
 }
 
+async function loadHouseholdMembers() {
+  householdMembers = [];
+  if (!cloudReady || !householdId || !cloud) return;
+  const { data, error } = await cloud.rpc("list_household_members");
+  if (!error && Array.isArray(data)) {
+    householdMembers = data;
+    return;
+  }
+  const fallback = await cloud
+    .from("household_members")
+    .select("household_id,user_id,role,created_at")
+    .eq("household_id", householdId);
+  householdMembers = fallback.data || [];
+}
+
+async function removeHouseholdMember(userId) {
+  if (!userId || userId === currentUser?.id) return;
+  const ok = confirm("Remover esta pessoa do cofre? Ela não verá mais os dados compartilhados.");
+  if (!ok) return;
+  const { error } = await cloud.rpc("remove_household_member", { member_user_id: userId });
+  if (error) {
+    showToast("Não deu para remover. Atualize o SQL do Supabase e tente de novo.", "error");
+    return;
+  }
+  householdMembers = householdMembers.filter((member) => member.user_id !== userId);
+  notify("invite", "Pessoa removida do cofre");
+  await commitState();
+  renderSettings();
+}
+
 function promptJoinHousehold() {
   const code = prompt("Cole aqui o código de convite do cofre compartilhado:", "");
   if (!code) return;
@@ -1116,6 +1160,7 @@ async function loadCloudState() {
     await saveCloudState();
   }
   cloudReady = true;
+  await loadHouseholdMembers();
   startCloudPolling();
 }
 
@@ -2725,6 +2770,15 @@ function renderSettings() {
       <div class="panel danger-zone">
         <h2>Configurações da conta</h2>
         <div class="list">
+          <div class="list-item">
+            <div><strong>Pessoas conectadas</strong><span>${householdMembers.length || 1} pessoa${(householdMembers.length || 1) === 1 ? "" : "s"} neste cofre financeiro.</span></div>
+          </div>
+          ${householdMembers.length ? householdMembers.map((member) => `
+            <div class="list-item member-row">
+              <div><strong>${memberDisplayName(member)}</strong><span>${member.role === "owner" ? "Dono do cofre" : "Membro"} · ${member.user_id === currentUser?.id ? currentUser.email : "acesso compartilhado"}</span></div>
+              ${member.user_id !== currentUser?.id ? `<button class="tiny danger" type="button" data-remove-member="${member.user_id}">Remover</button>` : ""}
+            </div>
+          `).join("") : ""}
           ${inviteCode ? `
             <div class="list-item invite-config">
               <div><strong>Código do cofre</strong><span>${inviteCodeVisible ? inviteCode : "••••••••••"}</span></div>
@@ -2737,6 +2791,7 @@ function renderSettings() {
             <button class="ghost" id="rotate-invite-code" type="button">Gerar novo código</button>
           ` : ""}
           <button class="ghost" id="join-by-code" type="button">Entrar com código de outro cofre</button>
+          <button class="ghost" id="restart-tour" type="button">Ver primeiros passos de novo</button>
           <button class="ghost" id="logout" type="button">Sair da conta</button>
           <button class="danger" id="reset-data" type="button">Reiniciar controle do zero</button>
         </div>
@@ -2757,7 +2812,16 @@ function renderSettings() {
   if (copyInvite) copyInvite.addEventListener("click", copyInviteLink);
   const rotateInvite = qs("#rotate-invite-code");
   if (rotateInvite) rotateInvite.addEventListener("click", rotateInviteCode);
+  document.querySelectorAll("[data-remove-member]").forEach((button) => {
+    button.addEventListener("click", () => removeHouseholdMember(button.dataset.removeMember));
+  });
   qs("#join-by-code").addEventListener("click", promptJoinHousehold);
+  qs("#restart-tour").addEventListener("click", () => {
+    state.tutorialDone = false;
+    state.onboardingDone = false;
+    tutorialStep = 0;
+    commitState();
+  });
   qs("#logout").addEventListener("click", signOut);
   qs("#reset-data").addEventListener("click", resetData);
 }
