@@ -638,10 +638,18 @@ function renderModal() {
   modal.innerHTML = `
     <div class="modal-card">
       <div class="modal-head">
-        <strong>Lançamento rápido</strong>
+        <strong>Ação rápida</strong>
         <button class="ghost tiny" id="close-modal" type="button">Fechar</button>
       </div>
+      <div class="quick-shortcuts">
+        <button class="quick-shortcut" type="button" data-view="entries"><b>＋</b><span>Lançar entrada/saída</span></button>
+        <button class="quick-shortcut" type="button" data-view="cards"><b>▣</b><span>Compra no cartão</span></button>
+        <button class="quick-shortcut" type="button" data-view="fixed"><b>◷</b><span>Despesa fixa</span></button>
+        <button class="quick-shortcut" type="button" data-view="accounts"><b>≋</b><span>Carteira</span></button>
+        <button class="quick-shortcut danger-soft" type="button" id="quick-logout"><b>↩</b><span>Sair da conta</span></button>
+      </div>
       <form class="auth-actions" id="quick-form">
+        <small class="quick-form-title">Ou salve um lançamento simples aqui</small>
         ${select("type", "Tipo", ["Saída", "Entrada"])}
         ${input("value", "Valor", "number", "", "0.01")}
         ${input("description", "Descrição", "text", "")}
@@ -651,6 +659,11 @@ function renderModal() {
     </div>
   `;
   qs("#close-modal").addEventListener("click", closeModal);
+  modal.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", closeModal));
+  qs("#quick-logout").addEventListener("click", () => {
+    closeModal();
+    signOut();
+  });
   modal.addEventListener("click", (event) => {
     if (event.target === modal) closeModal();
   }, { once: true });
@@ -1131,8 +1144,6 @@ function ensureMoreNavigation() {
 function renderDashboard() {
   const summary = currentSummary();
   const forecast = monthForecast(summary);
-  const report = monthlyReport();
-  const insights = dashboardInsights(summary);
   const budgetAlerts = budgetWarnings();
   const categoryTotals = byMonth(state.entries)
     .filter((item) => item.type === "Despesa")
@@ -1141,7 +1152,6 @@ function renderDashboard() {
   const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
   const actionCards = dashboardActionCards(summary, forecast, todaySummary(), budgetAlerts, topCategory);
   const mood = dashboardMood(summary.balance, summary.salaryTotal);
-  const today = todaySummary();
 
   qs("#dashboard").innerHTML = `
     <section class="bank-home">
@@ -1166,57 +1176,24 @@ function renderDashboard() {
     </section>
     ${initialSetupPanel()}
     <div class="summary-grid bank-metrics compact-dashboard">
-      ${metric("Saldo previsto", forecast.afterAll, forecast.afterAll >= 0 ? "good" : "bad")}
-      ${metric("Próxima conta", forecast.nextBill?.value || 0, forecast.nextBill ? "warn" : "good")}
-      ${metric("Fatura atual", summary.cardMonth, "info")}
-      ${metric("Meta guardada", summary.goalsSaved, "good")}
-      ${metric("Salário disponível", summary.salaryTotal, "good")}
+      ${metric("Entradas", summary.income + summary.salaryTotal, "good")}
+      ${metric("Saídas", summary.expense + summary.fixedPaid, "bad")}
+      ${metric("Cartões", summary.cardMonth, "info")}
+      ${metric("Metas", summary.goalsSaved, "good")}
     </div>
     <div class="grid-2">
-      <div class="panel today-panel">
-        <h2>Hoje</h2>
-        <div class="today-grid">
-          <div><span>Entrou</span><strong>${formatMoney(today.income)}</strong></div>
-          <div><span>Saiu</span><strong>${formatMoney(today.expense)}</strong></div>
-          <div><span>Vence hoje</span><strong>${today.dueToday}</strong></div>
-          <div><span>Atrasadas</span><strong>${today.overdue}</strong></div>
-          <div><span>Próximo salário</span><strong>${nextSalaryText()}</strong></div>
+      <div class="panel dashboard-priority">
+        <div class="section-title">
+          <span>!</span>
+          <div><h2>O que olhar agora</h2><small>Alertas do mês e próximos passos</small></div>
         </div>
-        <button class="ghost" type="button" data-view="agenda">Ver agenda</button>
-      </div>
-      <div class="panel">
-        <h2>O que merece atenção</h2>
         <div class="list">
           ${actionCards.map(dashboardActionCard).join("")}
         </div>
       </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
+      <div class="panel dashboard-chart">
         <h2>Gráfico do mês</h2>
         ${donutChart(chartData)}
-      </div>
-      <div class="panel">
-        <h2>Distribuição</h2>
-        <div class="bars">
-          ${chartData.length ? chartData.map((item) => bar(item.label, item.value, Math.max(1, ...chartData.map((row) => row.value)), item.color)).join("") : emptyHtml()}
-        </div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="panel">
-        <h2>Resumo inteligente</h2>
-        <div class="insight-grid">
-          ${insights.map((item) => `<div class="insight-card"><span>${item.label}</span><strong>${item.value}</strong><small>${item.note}</small></div>`).join("")}
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Comparativo mensal</h2>
-        <div class="list">
-          <div class="list-item"><div><strong>Gastos vs mês anterior</strong><span>${report.expenseText}</span></div><b>${formatMoney(report.expenseDiff)}</b></div>
-          <div class="list-item"><div><strong>Entradas vs mês anterior</strong><span>${report.incomeText}</span></div><b>${formatMoney(report.incomeDiff)}</b></div>
-          <div class="list-item"><div><strong>Categoria que mais pesa</strong><span>${report.topCategory || "Sem categoria"}</span></div><b>${formatMoney(report.topCategoryValue)}</b></div>
-        </div>
       </div>
     </div>
   `;
@@ -1226,7 +1203,7 @@ function initialSetupPanel() {
   const salaryTotal = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
   const steps = [
     {
-      done: salaryTotal > 0 || state.entries.some((item) => item.type === "Receita"),
+      done: salaryTotal > 0,
       icon: "R$",
       title: "Colocar uma renda",
       note: "Cadastre o salário médio de pelo menos uma pessoa.",
@@ -1326,9 +1303,11 @@ function monthForecast(summary = currentSummary()) {
 
 function monthlyReport() {
   const current = state.selectedMonth;
-  const previous = months[(monthIndex(current) + 11) % 12];
-  const currentEntries = byMonth(state.entries, current);
-  const previousEntries = byMonth(state.entries, previous);
+  const currentIndex = monthIndex(current);
+  const previous = months[(currentIndex + 11) % 12];
+  const previousYear = Number(state.selectedYear) - (currentIndex === 0 ? 1 : 0);
+  const currentEntries = byMonth(state.entries, current, state.selectedYear);
+  const previousEntries = byMonth(state.entries, previous, previousYear);
   const currentExpense = total(currentEntries.filter((item) => item.type === "Despesa"));
   const previousExpense = total(previousEntries.filter((item) => item.type === "Despesa"));
   const currentIncome = total(currentEntries.filter((item) => item.type === "Receita"));
@@ -2390,29 +2369,37 @@ function addGoal(event) {
 function renderMore() {
   const summary = currentSummary();
   const items = [
-    { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}` },
-    { view: "accounts", icon: "≋", title: "Nossa carteira", note: `${state.accounts.length} contas · organize saldo e cartões` },
-    { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}` },
-    { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal" },
-    { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar" }
+    { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
+    { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
+    { view: "accounts", icon: "≋", title: "Contas e dinheiro", note: `${state.accounts.length} contas · organize onde o dinheiro fica`, tone: "green" },
+    { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
+    { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" },
+    { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar", tone: "violet" }
   ];
   qs("#more").innerHTML = `
-    <div class="panel helper-panel">
-      <h2>Mais opções</h2>
-      <p>As telas menos usadas ficam aqui para o rodapé do celular não ficar apertado.</p>
-    </div>
-    <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
-      <b>↩</b>
-      <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
-    </button>
+    <section class="more-hero">
+      <div>
+        <span>Menu do casal</span>
+        <h2>Organize sem lotar a tela inicial</h2>
+        <p>As áreas de consulta e configuração ficam aqui, separadas por assunto.</p>
+      </div>
+      <div class="more-hero-balance">
+        <small>Saldo do mês</small>
+        <strong>${formatMoney(summary.balance)}</strong>
+      </div>
+    </section>
     <div class="more-grid">
       ${items.map((item) => `
-        <button class="more-card" type="button" data-view="${item.view}">
+        <button class="more-card ${item.tone}" type="button" data-view="${item.view}">
           <b>${item.icon}</b>
           <span><strong>${item.title}</strong><small>${item.note}</small></span>
         </button>
       `).join("")}
     </div>
+    <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
+      <b>↩</b>
+      <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
+    </button>
   `;
   qs("#logout-more").addEventListener("click", signOut);
 }
