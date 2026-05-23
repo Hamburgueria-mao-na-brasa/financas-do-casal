@@ -1746,7 +1746,27 @@ td.amount {
 
 .statement-list {
   display: grid;
-  gap: 10px;
+  gap: 16px;
+}
+
+.statement-day {
+  display: grid;
+  gap: 8px;
+  position: relative;
+}
+
+.statement-day-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 0 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statement-day-head strong {
+  color: var(--ink);
 }
 
 .statement-item {
@@ -2893,8 +2913,13 @@ button.list-item {
   }
 
   body.app-ready .statement-item span,
+  body.app-ready .statement-day-head,
   body.app-ready .notification-item small {
     color: #b9d7d1;
+  }
+
+  body.app-ready .statement-day-head strong {
+    color: #f2fff9;
   }
 
   body.app-ready .statement-icon,

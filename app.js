@@ -51,7 +51,7 @@ let confirmAction = null;
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
   ["Lançamentos", "Registre somente entradas e saídas feitas na hora. Compras no cartão ficam na aba Cartões."],
-  ["Contas Fixas", "Cadastre aluguel, internet, energia e dívidas mensais. Marque como pago quando sair o dinheiro."],
+  ["Despesas Fixas", "Cadastre aluguel, internet, energia e dívidas mensais. Marque como pago quando sair o dinheiro."],
   ["Nossa Carteira", "Cadastre contas, cartões e rendas como salário. É a base do controle."],
   ["Cartões", "Lance compras parceladas e acompanhe fatura atual, próxima fatura e limite usado."],
   ["50/30/20", "Planeje renda entre essenciais, investimentos e desejos."],
@@ -131,6 +131,15 @@ function getInstallmentSchedule(item) {
   }));
 }
 
+function invoiceMonthForPurchase(dateValue, cardName) {
+  const card = state.cards.find((item) => item.name === cardName);
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return state.selectedMonth;
+  const purchaseMonth = months[date.getUTCMonth()];
+  const closeDay = Number(card?.closeDay || 20);
+  return date.getUTCDate() > closeDay ? months[(date.getUTCMonth() + 1) % 12] : purchaseMonth;
+}
+
 function cardTotals(cardName) {
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   const scheduled = state.installments
@@ -177,7 +186,7 @@ function pageTitle(view) {
     dashboard: "Visão geral",
     entries: "Lançamentos",
     statement: "Extrato",
-    fixed: "Contas Fixas",
+    fixed: "Despesas Fixas",
     agenda: "Agenda",
     cards: "Cartões",
     accounts: "Nossa Carteira",
@@ -1297,7 +1306,7 @@ function monthChartData(summary) {
     { label: "Entradas", value: summary.salaryTotal + summary.income, color: "#00bf7a" },
     { label: "Saídas", value: summary.expense, color: "#f04438" },
     { label: "Cartões", value: summary.cardMonth, color: "#147dff" },
-    { label: "Contas fixas", value: summary.fixedPaid + summary.fixedPending, color: "#ffb020" }
+    { label: "Despesas fixas", value: summary.fixedPaid + summary.fixedPending, color: "#ffb020" }
   ].map((item) => ({ ...item, value: Number(item.value || 0) }))
     .filter((item) => Number.isFinite(item.value) && item.value > 0);
 }
@@ -1419,7 +1428,7 @@ function renderOnboarding() {
       ${onboardingStep(Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0), "Cadastrar renda", "settings", "Informe o salário médio de pelo menos uma pessoa para a visão geral funcionar.")}
       ${onboardingStep(state.accounts.length, "Adicionar carteira", "accounts", "Cadastre onde o dinheiro fica: banco, dinheiro em casa ou conta digital.")}
       ${onboardingStep(state.cards.length, "Cadastrar cartão", "accounts", "Inclua o cartão e limite para acompanhar fatura e compras parceladas.")}
-      ${onboardingStep(state.fixedBills.length, "Contas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
+      ${onboardingStep(state.fixedBills.length, "Despesas fixas", "fixed", "Cadastre aluguel, internet, energia e dívidas mensais.")}
       ${onboardingStep(state.fixedBills.length || state.goals.length, "Conferir agenda", "agenda", "Veja contas vencendo, faturas abertas e metas com data.")}
       ${onboardingStep(state.entries.length || state.installments.length, "Primeiro lançamento", "entries", "Registre uma entrada ou saída para começar o histórico do mês.")}
       ${onboardingStep(state.entries.length || state.installments.length, "Ver extrato", "statement", "Acompanhe tudo que já foi lançado, inclusive pagos e pendentes.")}
@@ -1697,6 +1706,7 @@ function renderStatement() {
     if (!query) return true;
     return [item.title, item.detail, item.kind, item.value].join(" ").toLowerCase().includes(query);
   });
+  const groupedRows = groupStatementRows(rows);
 
   qs("#statement").innerHTML = `
     <div class="panel helper-panel">
@@ -1713,7 +1723,7 @@ function renderStatement() {
       </div>
     </div>
     <div class="statement-list panel">
-      ${rows.length ? rows.map(statementRow).join("") : emptyHtml()}
+      ${rows.length ? Object.entries(groupedRows).map(([date, items]) => statementDayGroup(date, items)).join("") : emptyHtml()}
     </div>
   `;
   qs("#statement-search").addEventListener("input", (event) => {
@@ -1726,6 +1736,28 @@ function renderStatement() {
       renderStatement();
     });
   });
+}
+
+function groupStatementRows(rows) {
+  return rows.reduce((acc, item) => {
+    const key = item.date;
+    acc[key] ||= [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+}
+
+function statementDayGroup(date, items) {
+  const dayTotal = items.reduce((sum, item) => sum + (item.tone === "income" ? Number(item.value || 0) : -Number(item.value || 0)), 0);
+  return `
+    <section class="statement-day">
+      <div class="statement-day-head">
+        <strong>${dateFmt.format(new Date(`${date}T00:00:00Z`))}</strong>
+        <span>${formatMoney(dayTotal)}</span>
+      </div>
+      ${items.map(statementRow).join("")}
+    </section>
+  `;
 }
 
 function fixedDateForMonth(item) {
@@ -1755,18 +1787,18 @@ function statementRow(item) {
 function renderFixedBills() {
   qs("#fixed").innerHTML = `
     <div class="panel helper-panel">
-      <h2>Gastos fixos fora do cartão</h2>
-      <p>Use aqui para contas pagas por Pix, boleto, dinheiro ou débito. Se a conta cai na fatura, cadastre em <strong>Cartões &gt; Fixo mensal no cartão</strong>.</p>
+      <h2>Despesas fixas</h2>
+      <p>Aba exclusiva para aluguel, água, energia, internet, financiamentos, empréstimos e contas mensais fora do cartão.</p>
     </div>
     <form class="settings-form" id="fixed-form">
-      <div class="span-3"><h2>Adicionar gasto fixo</h2></div>
+      <div class="span-3"><h2>Adicionar despesa fixa</h2></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
       ${input("value", "Valor", "number", "0", "0.01", "Valor mensal dessa conta.")}
       ${input("dueDay", "Vencimento", "number", "10", "1", "Dia do mês em que vence.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa conta fixa.")}
       ${select("person", "Responsável", appPeople(), "", "Quem costuma pagar ou acompanhar essa conta.")}
       ${select("status", "Status", ["Pendente", "Pago"], "Pendente", "Pago entra no cálculo do saldo. Pendente aparece em atenção.")}
-      <button class="primary form-submit" type="submit">Salvar gasto fixo</button>
+      <button class="primary form-submit" type="submit">Salvar despesa fixa</button>
     </form>
     <div class="wallet-list">
       ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
@@ -2028,6 +2060,9 @@ function addInstallment(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
   if (!state.cards.length) return;
+  const purchaseMonth = months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()];
+  const realInvoiceMonth = invoiceMonthForPurchase(data.date, data.card);
+  const firstMonth = data.firstMonth === purchaseMonth ? realInvoiceMonth : data.firstMonth;
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
@@ -2036,7 +2071,7 @@ function addInstallment(event) {
     category: data.category,
     value: Number(data.value || 0),
     parts: Number(data.parts || 1),
-    firstMonth: data.firstMonth,
+    firstMonth,
     paidMonths: []
   });
   notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
