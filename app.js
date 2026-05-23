@@ -14,6 +14,7 @@ const seed = {
   entries: [],
   installments: [],
   cardRecurring: [],
+  cardPayments: [],
   fixedBills: [],
   methodIncome: 0,
   goals: [],
@@ -46,9 +47,11 @@ let tutorialStep = 0;
 let inviteCodeVisible = false;
 let entryFilter = "Todos";
 let statementFilter = "Todos";
+let statementCardFilter = "Todos";
 let statementSearch = "";
 let confirmAction = null;
 let toastTimer = null;
+const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
@@ -88,6 +91,7 @@ function ensureStateShape() {
   state.installments = state.installments.map((item) => ({ ...item, paidMonths: item.paidMonths || [] }));
   state.cardRecurring ||= [];
   state.cardRecurring = state.cardRecurring.map((item) => ({ ...item, paidMonths: item.paidMonths || [], active: item.active !== false }));
+  state.cardPayments ||= [];
   state.fixedBills ||= [];
   state.fixedBills = state.fixedBills.map((item) => ({ ...item, paidMonths: item.paidMonths || (item.status === "Pago" ? [state.selectedMonth] : []) }));
   state.goals ||= [];
@@ -571,6 +575,7 @@ function renderNotifications() {
 function renderTutorial() {
   const modal = qs("#app-modal");
   if (state.tutorialDone || modalMode) return;
+  document.body.classList.add("modal-open");
   modal.classList.add("open");
   const [title, text] = tutorialSteps[tutorialStep];
   modal.innerHTML = `
@@ -606,6 +611,7 @@ function renderTutorial() {
 
 function finishTutorial() {
   state.tutorialDone = true;
+  document.body.classList.remove("modal-open");
   qs("#app-modal").classList.remove("open");
   qs("#app-modal").innerHTML = "";
   commitState();
@@ -618,6 +624,7 @@ function openQuickAdd() {
 
 function closeModal() {
   modalMode = null;
+  document.body.classList.remove("modal-open");
   qs("#app-modal").classList.remove("open");
   qs("#app-modal").innerHTML = "";
 }
@@ -625,6 +632,7 @@ function closeModal() {
 function renderModal() {
   const modal = qs("#app-modal");
   if (!modalMode) return closeModal();
+  document.body.classList.add("modal-open");
   modal.classList.add("open");
   if (typeof modalMode === "object") {
     modal.innerHTML = editModalHtml(modalMode);
@@ -1755,6 +1763,7 @@ function accountOptions() {
 }
 
 function renderStatement() {
+  const cardInvoices = state.cards.map(cardStatementSummary);
   let rows = [
     ...byMonth(state.entries).map((item) => ({
       id: item.id,
@@ -1788,6 +1797,17 @@ function renderStatement() {
       tone: "card",
       action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${isPeriodPaid(item) ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
     })),
+    ...cardPaymentRows().map((item) => ({
+      id: item.id,
+      kind: "Cartão",
+      date: item.date,
+      title: item.description,
+      detail: `${item.card} · pagamento da fatura · ${item.month}/${item.year}`,
+      value: Number(item.value || 0),
+      tone: "card-payment",
+      card: item.card,
+      action: `<button class="tiny danger" data-delete-card-payment="${item.id}">Excluir pagamento</button>`
+    })),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
       kind: "Conta fixa",
@@ -1802,6 +1822,7 @@ function renderStatement() {
   const query = statementSearch.trim().toLowerCase();
   rows = rows.filter((item) => {
     if (statementFilter !== "Todos" && item.kind !== statementFilter) return false;
+    if (statementFilter === "Cartão" && statementCardFilter !== "Todos" && item.card !== statementCardFilter && !String(item.detail || "").includes(statementCardFilter)) return false;
     if (!query) return true;
     return [item.title, item.detail, item.kind, item.value].join(" ").toLowerCase().includes(query);
   });
@@ -1821,6 +1842,20 @@ function renderStatement() {
         ${["Todos", "Entrada", "Saída", "Cartão", "Conta fixa"].map((filter) => `<button class="${statementFilter === filter ? "active" : ""}" type="button" data-statement-filter="${filter}">${filter}</button>`).join("")}
       </div>
     </div>
+    ${statementFilter === "Cartão" ? `
+      <div class="panel soft-panel card-statement-panel">
+        <div class="section-title"><span>▣</span><div><h2>Extrato por cartão</h2><small>Compras, parcelas, assinaturas e pagamentos da fatura.</small></div></div>
+        <label class="field statement-card-select">
+          <span>Cartão</span>
+          <select id="statement-card-filter">
+            ${["Todos", ...state.cards.map((card) => card.name)].map((card) => `<option ${statementCardFilter === card ? "selected" : ""}>${card}</option>`).join("")}
+          </select>
+        </label>
+        <div class="card-invoice-grid">
+          ${cardInvoices.filter((item) => statementCardFilter === "Todos" || item.card === statementCardFilter).map(cardStatementCard).join("") || emptyHtml()}
+        </div>
+      </div>
+    ` : ""}
     <div class="statement-list panel">
       ${rows.length ? Object.entries(groupedRows).map(([date, items]) => statementDayGroup(date, items)).join("") : emptyHtml()}
     </div>
@@ -1832,8 +1867,14 @@ function renderStatement() {
   document.querySelectorAll("[data-statement-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       statementFilter = button.dataset.statementFilter;
+      if (statementFilter !== "Cartão") statementCardFilter = "Todos";
       renderStatement();
     });
+  });
+  const cardFilter = qs("#statement-card-filter");
+  if (cardFilter) cardFilter.addEventListener("change", (event) => {
+    statementCardFilter = event.target.value;
+    renderStatement();
   });
 }
 
@@ -1865,6 +1906,53 @@ function fixedDateForMonth(item) {
 
 function recurringCardDateForMonth(item) {
   return new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
+}
+
+function cardPaymentRows(cardName = "") {
+  return (state.cardPayments || []).filter((item) =>
+    item.month === state.selectedMonth &&
+    Number(item.year) === Number(state.selectedYear) &&
+    (!cardName || item.card === cardName)
+  );
+}
+
+function cardPaymentTotal(cardName) {
+  return total(cardPaymentRows(cardName));
+}
+
+function cardStatementSummary(card) {
+  const items = cardMonthItems(card.name);
+  const invoiceTotal = total(items);
+  const paidItems = total(items.filter((item) => item.paid));
+  const payments = cardPaymentTotal(card.name);
+  return {
+    card: card.name,
+    invoiceTotal,
+    paidItems,
+    payments,
+    open: Math.max(0, invoiceTotal - paidItems - payments),
+    itemCount: items.length
+  };
+}
+
+function cardStatementCard(item) {
+  return `
+    <article class="card-statement-card">
+      <div>
+        <span>Fatura ${state.selectedMonth}/${state.selectedYear}</span>
+        <strong>${item.card}</strong>
+      </div>
+      <div class="card-statement-values">
+        <span>Total <b>${formatMoney(item.invoiceTotal)}</b></span>
+        <span>Pago <b>${formatMoney(item.paidItems + item.payments)}</b></span>
+        <span>Aberto <b>${formatMoney(item.open)}</b></span>
+      </div>
+      <div class="card-actions">
+        <button class="tiny ghost" data-partial-card-payment="${item.card}">Pagar parcial</button>
+        <button class="tiny ghost" data-pay-card-month="${item.card}">Quitar fatura</button>
+      </div>
+    </article>
+  `;
 }
 
 function statementRow(item) {
@@ -3019,6 +3107,30 @@ document.addEventListener("change", (event) => {
     render();
   }
 });
+
+function rememberAwayTime() {
+  if (!currentUser) return;
+  localStorage.setItem("duofinAwayAt", String(Date.now()));
+}
+
+async function requireLoginAfterAway() {
+  if (!currentUser || !cloud) return;
+  const awayAt = Number(localStorage.getItem("duofinAwayAt") || 0);
+  if (!awayAt) return;
+  if (Date.now() - awayAt >= AUTO_LOCK_MS) {
+    localStorage.removeItem("duofinAwayAt");
+    await signOut();
+    renderGate("Por segurança, entre novamente. O app ficou fechado por mais de 5 minutos.");
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) rememberAwayTime();
+  else requireLoginAfterAway();
+});
+
+window.addEventListener("pagehide", rememberAwayTime);
+window.addEventListener("focus", requireLoginAfterAway);
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});

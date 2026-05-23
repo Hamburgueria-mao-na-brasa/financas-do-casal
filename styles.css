@@ -123,6 +123,10 @@ body.app-ready .auth-screen {
   display: none;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .auth-screen {
   min-height: 100vh;
   display: grid;
@@ -554,6 +558,8 @@ h2 {
   gap: 8px;
   padding: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .notification-item {
@@ -1190,9 +1196,13 @@ h2 {
   position: fixed;
   inset: 0;
   z-index: 60;
-  place-items: center;
+  align-items: center;
+  justify-items: center;
   padding: 18px;
   background: rgba(10, 26, 28, .48);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-backdrop.open {
@@ -1201,10 +1211,13 @@ h2 {
 
 .modal-card {
   width: min(440px, 100%);
+  max-height: calc(100vh - 36px);
   background: var(--panel);
   border-radius: 20px;
   box-shadow: 0 28px 70px rgba(10, 26, 28, .28);
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-head {
