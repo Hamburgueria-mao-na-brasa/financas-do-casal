@@ -696,6 +696,20 @@ h2 {
   background: #f0fff8;
 }
 
+.notification-item.partner-change {
+  border-color: rgba(19, 216, 255, .30);
+  background:
+    linear-gradient(90deg, rgba(19, 216, 255, .10), transparent 42%),
+    #fbfffd;
+}
+
+.notification-item.auto-alert {
+  border-color: rgba(255, 176, 32, .34);
+  background:
+    linear-gradient(90deg, rgba(255, 176, 32, .12), transparent 42%),
+    #fffdfa;
+}
+
 .notification-item > span {
   width: 38px;
   height: 38px;
@@ -2989,6 +3003,16 @@ button.list-item {
   .notification-item.unread {
     background: rgba(0, 191, 122, .13);
     border-color: rgba(0, 224, 154, .35);
+  }
+
+  .notification-item.partner-change {
+    background: rgba(19, 216, 255, .13);
+    border-color: rgba(19, 216, 255, .38);
+  }
+
+  .notification-item.auto-alert {
+    background: rgba(255, 176, 32, .13);
+    border-color: rgba(255, 176, 32, .34);
   }
 
   .notification-item small {

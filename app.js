@@ -498,14 +498,38 @@ function renderCloudPanel(message = "") {
 }
 
 function unreadCount() {
-  return (state.notifications || []).filter((item) => !item.read).length;
+  return (state.notifications || []).filter((item) => !isNotificationRead(item)).length;
 }
 
 function currentActor() {
   return currentUser?.email?.split("@")[0] || "Alguém";
 }
 
-function notify(type, text, view = "", visible = true) {
+function currentActorId() {
+  return currentUser?.id || currentUser?.email || "local";
+}
+
+function notificationUserKey() {
+  return currentActorId();
+}
+
+function isNotificationRead(item) {
+  return Boolean(item.readBy?.[notificationUserKey()]);
+}
+
+function markNotificationRead(item, view = item.view) {
+  return {
+    ...item,
+    view,
+    read: false,
+    readBy: {
+      ...(item.readBy || {}),
+      [notificationUserKey()]: new Date().toISOString()
+    }
+  };
+}
+
+function notify(type, text, view = "", visible = true, source = "user") {
   ensureStateShape();
   state.notifications.unshift({
     id: crypto.randomUUID(),
@@ -513,8 +537,11 @@ function notify(type, text, view = "", visible = true) {
     text,
     view: view || notificationTarget(type, text),
     actor: currentActor(),
+    actorId: currentActorId(),
+    source,
     at: new Date().toISOString(),
-    read: false
+    read: false,
+    readBy: {}
   });
   state.notifications = state.notifications.slice(0, 30);
   if (visible) showToast(text, type === "card" ? "info" : "success");
@@ -524,7 +551,7 @@ function smartNotify(key, type, text, view = "") {
   const scopedKey = `${state.selectedMonth}:${key}`;
   if (state.notificationMarks[scopedKey]) return;
   state.notificationMarks[scopedKey] = true;
-  notify(type, text, view, false);
+  notify(type, text, view, false, "auto");
 }
 
 function showToast(text, tone = "success") {
@@ -604,7 +631,7 @@ function renderNotifications() {
     </div>
   `;
   qs("#mark-read").addEventListener("click", () => {
-    state.notifications = state.notifications.map((item) => ({ ...item, read: true }));
+    state.notifications = state.notifications.map((item) => markNotificationRead(item));
     commitState();
     notificationsOpen = true;
     renderNotifications();
@@ -875,10 +902,14 @@ function saveQuickEntry(event) {
 function notificationItem(item) {
   const time = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(item.at));
   const view = item.view || notificationTarget(item.type, item.text);
+  const read = isNotificationRead(item);
+  const isAuto = item.source === "auto";
+  const isOwn = !item.actorId ? item.actor === currentActor() : item.actorId === currentActorId();
+  const origin = isAuto ? "Alerta automático" : isOwn ? "Você" : `${item.actor || "Parceiro"} · parceiro`;
   return `
-    <button class="notification-item ${item.read ? "" : "unread"}" type="button" data-notification-id="${item.id}" data-notification-view="${view}">
+    <button class="notification-item ${read ? "" : "unread"} ${isAuto ? "auto-alert" : isOwn ? "own-change" : "partner-change"}" type="button" data-notification-id="${item.id}" data-notification-view="${view}">
       <span>${notificationIcon(item.type)}</span>
-      <div><strong>${item.text}</strong><small>${item.actor} · ${time} · abrir ${pageTitle(view) || "tela"}</small></div>
+      <div><strong>${item.text}</strong><small>${origin} · ${time} · abrir ${pageTitle(view) || "tela"}</small></div>
     </button>
   `;
 }
@@ -3062,7 +3093,7 @@ document.addEventListener("click", (event) => {
     const id = notificationButton.dataset.notificationId;
     const item = (state.notifications || []).find((notification) => notification.id === id);
     const view = notificationButton.dataset.notificationView || item?.view || notificationTarget(item?.type, item?.text);
-    state.notifications = (state.notifications || []).map((notification) => notification.id === id ? { ...notification, read: true, view } : notification);
+    state.notifications = (state.notifications || []).map((notification) => notification.id === id ? markNotificationRead(notification, view) : notification);
     notificationsOpen = false;
     setActiveView(view);
     commitState();
