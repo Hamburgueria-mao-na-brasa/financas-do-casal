@@ -321,6 +321,12 @@ function renderGate(message = "") {
     setAppReady(false);
     const isSignup = authMode === "signup";
     const isForgot = authMode === "forgot";
+    const title = isForgot ? "Recupere seu acesso" : isSignup ? "Comece do zero" : "Entre no DuoFin";
+    const subtitle = isForgot
+      ? "Enviamos um link seguro para você definir uma nova senha."
+      : isSignup
+        ? "Crie sua conta, cadastre sua renda e depois conecte seu parceiro pelo código."
+        : "Acesse o controle financeiro compartilhado do casal.";
     auth.innerHTML = `
       <div class="auth-card fintech-login">
         <div class="login-hero">
@@ -328,20 +334,31 @@ function renderGate(message = "") {
             <span class="brand-mark">DF</span>
             <div><strong>DuoFin</strong><small>Finanças do casal</small></div>
           </div>
-          <div class="login-balance-preview">
-            <span>Saldo organizado</span>
-            <strong>R$ 0,00</strong>
+          <div class="login-hero-copy">
+            <span>Controle compartilhado</span>
+            <strong>O dinheiro do casal em uma tela só.</strong>
+            <small>Salário, cartões, contas fixas, metas e faturas sincronizados.</small>
+          </div>
+          <div class="login-preview-grid">
+            <div><span>Compartilhado</span><strong>Casal</strong></div>
+            <div><span>Proteção</span><strong>Login</strong></div>
+            <div><span>Organização</span><strong>Mês</strong></div>
           </div>
         </div>
-        <h1>${isForgot ? "Definir nova senha" : isSignup ? "Criar conta" : "Entrar na sua conta"}</h1>
-        <p>${isForgot ? "Informe seu e-mail para receber um link seguro e criar uma senha." : isSignup ? "Crie sua conta e comece com tudo zerado. Depois convide seu companheiro para compartilhar os mesmos dados." : "Acesse seu painel financeiro do casal com segurança."}</p>
+        <div class="auth-copy">
+          <h1>${title}</h1>
+          <p>${subtitle}</p>
+        </div>
         <form id="login-form" class="auth-actions">
           <label class="field"><span>E-mail</span><input name="email" type="email" placeholder="voce@email.com" required></label>
           ${isForgot ? "" : passwordField("Senha")}
           <button class="primary" type="submit">${isForgot ? "Enviar link para senha" : isSignup ? "Criar conta" : "Entrar"}</button>
-          ${isForgot ? `<button class="ghost" id="toggle-auth" type="button">Voltar para entrar</button>` : `<button class="ghost" id="toggle-auth" type="button">${isSignup ? "Já tenho conta" : "Criar uma conta nova"}</button>`}
-          ${isSignup || isForgot ? "" : `<button class="ghost" id="forgot-password" type="button">Definir ou recuperar senha</button>`}
+          <div class="auth-secondary-actions">
+            ${isForgot ? `<button class="ghost" id="toggle-auth" type="button">Voltar para entrar</button>` : `<button class="ghost" id="toggle-auth" type="button">${isSignup ? "Já tenho conta" : "Criar conta nova"}</button>`}
+            ${isSignup || isForgot ? "" : `<button class="ghost" id="forgot-password" type="button">Recuperar senha</button>`}
+          </div>
         </form>
+        <div class="auth-safe-note"><b>✓</b><span>Se o app ficar fechado por 5 minutos, o login é pedido novamente.</span></div>
         ${message ? `<p class="mini-status">${message}</p>` : ""}
       </div>
     `;

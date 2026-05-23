@@ -133,22 +133,23 @@ body.modal-open {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 18% 18%, rgba(0, 191, 122, .30), transparent 26%),
-    radial-gradient(circle at 82% 12%, rgba(20, 125, 255, .28), transparent 25%),
-    radial-gradient(circle at 74% 76%, rgba(255, 176, 32, .20), transparent 22%),
-    linear-gradient(145deg, #f7fffb 0%, #e8fbff 48%, #fff8ee 100%),
-    var(--bg);
+    radial-gradient(circle at 18% 18%, rgba(19, 216, 255, .22), transparent 28%),
+    radial-gradient(circle at 82% 12%, rgba(123, 92, 255, .28), transparent 28%),
+    radial-gradient(circle at 74% 76%, rgba(255, 189, 47, .18), transparent 24%),
+    linear-gradient(145deg, #060b17 0%, #071225 52%, #100b27 100%);
 }
 
 .auth-card {
-  width: min(480px, 100%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
+  width: min(520px, 100%);
+  color: #f6f9ff;
+  background: rgba(17, 27, 52, .92);
+  border: 1px solid rgba(210, 226, 255, .16);
+  border-radius: 28px;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, .38);
   padding: 0;
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(18px);
 }
 
 .auth-card::before {
@@ -160,17 +161,17 @@ body.modal-open {
 }
 
 .fintech-login {
-  box-shadow: 0 28px 68px rgba(13, 49, 45, .18);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, .42);
 }
 
 .login-hero {
-  min-height: 180px;
+  min-height: 286px;
   padding: 26px;
   color: white;
   background:
-    radial-gradient(circle at 85% 18%, rgba(255, 224, 113, .38), transparent 24%),
-    radial-gradient(circle at 18% 80%, rgba(255, 79, 139, .28), transparent 26%),
-    linear-gradient(135deg, #071225 0%, #2563ff 54%, #7b5cff 118%);
+    radial-gradient(circle at 88% 16%, rgba(255, 189, 47, .34), transparent 25%),
+    radial-gradient(circle at 18% 82%, rgba(19, 216, 255, .26), transparent 28%),
+    linear-gradient(135deg, #071225 0%, #193a8a 52%, #7b5cff 118%);
 }
 
 .login-hero .brand {
@@ -182,27 +183,48 @@ body.modal-open {
   color: rgba(255, 255, 255, .74);
 }
 
-.login-balance-preview {
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, .22);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, .14);
+.login-hero-copy {
+  display: grid;
+  gap: 8px;
+  margin: 26px 0 18px;
 }
 
-.login-balance-preview span {
-  display: block;
+.login-hero-copy span,
+.login-hero-copy small,
+.login-preview-grid span {
   color: rgba(255, 255, 255, .72);
   font-size: 13px;
 }
 
-.login-balance-preview strong {
+.login-hero-copy strong {
   display: block;
-  margin-top: 8px;
-  font-size: 30px;
+  max-width: 380px;
+  font-size: clamp(31px, 7vw, 48px);
+  line-height: .98;
+}
+
+.login-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.login-preview-grid div {
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .12);
+}
+
+.login-preview-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: white;
+  font-size: 16px;
 }
 
 .auth-card .brand {
-  color: var(--ink);
+  color: #f6f9ff;
   margin: 0 0 24px;
   padding: 0;
 }
@@ -213,13 +235,17 @@ body.modal-open {
 
 .auth-card h1 {
   font-size: 32px;
-  margin: 26px 28px 10px;
+  margin: 0;
 }
 
 .auth-card p {
-  color: var(--muted);
+  color: #b8c5db;
   line-height: 1.5;
-  margin: 0 28px 18px;
+  margin: 8px 0 0;
+}
+
+.auth-copy {
+  padding: 26px 28px 12px;
 }
 
 .auth-actions {
@@ -234,8 +260,43 @@ body.modal-open {
 }
 
 .auth-actions .ghost {
-  background: transparent;
-  border: 1px solid var(--line);
+  color: #f6f9ff;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(210, 226, 255, .14);
+}
+
+.auth-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.auth-secondary-actions .ghost:only-child {
+  grid-column: 1 / -1;
+}
+
+.auth-safe-note {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: -8px 28px 24px;
+  padding: 12px;
+  color: #b8c5db;
+  border: 1px solid rgba(210, 226, 255, .12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .06);
+  font-size: 13px;
+}
+
+.auth-safe-note b {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #071225;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
 }
 
 .password-wrap {
@@ -244,21 +305,22 @@ body.modal-open {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfffd;
+  background: rgba(255, 255, 255, .07);
   overflow: hidden;
 }
 
 .password-wrap input {
   border: 0;
   background: transparent;
+  color: #f6f9ff;
 }
 
 .show-password {
   min-height: 42px;
-  padding: 0 12px;
-  color: var(--blue);
-  background: #edf4ff;
-  border-left: 1px solid var(--line);
+  padding: 0 14px;
+  color: #071225;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  border-left: 1px solid rgba(210, 226, 255, .14);
   font-weight: 800;
 }
 
@@ -3464,8 +3526,6 @@ button.list-item {
 
   .auth-card h1 {
     font-size: 28px;
-    margin-left: 22px;
-    margin-right: 22px;
   }
 
   .auth-card p,
@@ -3480,8 +3540,29 @@ button.list-item {
   }
 
   .login-hero {
-    min-height: 160px;
+    min-height: 250px;
     padding: 22px;
+  }
+
+  .login-hero-copy strong {
+    font-size: 34px;
+  }
+
+  .login-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-copy {
+    padding: 22px 22px 10px;
+  }
+
+  .auth-secondary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-safe-note {
+    margin-left: 22px;
+    margin-right: 22px;
   }
 }
 
