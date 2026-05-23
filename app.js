@@ -2158,7 +2158,7 @@ function cardSummary(card) {
   const totals = cardTotals(card.name);
   const available = Number(card.limit || 0) - totals.used;
   const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
-  return `<article class="credit-card ${card.color || "Verde"}">
+  return `<article class="credit-card ${card.color || "Azul"}">
     <div>
       <span>Cartão de crédito</span>
       <strong>${card.name}</strong>
@@ -2262,7 +2262,7 @@ function renderAccounts() {
       ${input("limit", "Limite total", "number", "0", "0.01", "Limite aprovado no cartão de crédito.")}
       ${input("closeDay", "Fecha dia", "number", "20", "1", "Dia em que a fatura fecha.")}
       ${input("dueDay", "Vence dia", "number", "10", "1", "Dia em que a fatura vence.")}
-      ${select("color", "Cor", ["Verde", "Azul", "Roxo", "Dourado", "Preto"], "", "Só muda a aparência do cartão no app.")}
+      ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda a aparência do cartão no app.")}
       <button class="primary" type="submit">Adicionar cartão</button>
     </form>
     </div>
@@ -2376,7 +2376,7 @@ function renderMethod() {
   const income = salaryTotal;
   const rows = [
     ["50%", "Necessidades", income * .5, "#1677ff"],
-    ["30%", "Guardar e investir", income * .3, "#00a86b"],
+    ["30%", "Guardar e investir", income * .3, "#7b5cff"],
     ["20%", "Desejos e lazer", income * .2, "#f4a51c"]
   ];
   qs("#method").innerHTML = `
@@ -2457,7 +2457,7 @@ function renderMore() {
   const items = [
     { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
     { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
-    { view: "accounts", icon: "≋", title: "Contas e dinheiro", note: `${state.accounts.length} contas · organize onde o dinheiro fica`, tone: "green" },
+    { view: "accounts", icon: "≋", title: "Contas e dinheiro", note: `${state.accounts.length} contas · organize onde o dinheiro fica`, tone: "cyan" },
     { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
     { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" },
     { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar", tone: "violet" }
@@ -2699,7 +2699,7 @@ function addCard(event) {
     limit: Number(data.limit || 0),
     closeDay: Number(data.closeDay || 20),
     dueDay: Number(data.dueDay || 10),
-    color: data.color || "Verde"
+    color: data.color || "Azul"
   });
   notify("card", `Cartão cadastrado: ${data.name} · limite ${formatMoney(Number(data.limit || 0))}`);
   commitState();

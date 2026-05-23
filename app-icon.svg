@@ -8,7 +8,7 @@
     <linearGradient id="mark" x1="132" y1="122" x2="382" y2="390" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffbd2f"/>
       <stop offset=".48" stop-color="#13d8ff"/>
-      <stop offset="1" stop-color="#18c37e"/>
+      <stop offset="1" stop-color="#7b5cff"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>

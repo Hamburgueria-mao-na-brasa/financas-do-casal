@@ -152,7 +152,7 @@ body.app-ready .auth-screen {
   position: absolute;
   inset: 0 0 auto;
   height: 6px;
-  background: linear-gradient(90deg, var(--green), var(--blue), var(--gold));
+  background: linear-gradient(90deg, var(--teal), var(--blue), var(--violet), var(--gold));
 }
 
 .fintech-login {
@@ -322,7 +322,7 @@ button {
   color: #071225;
   border-radius: 8px;
   font-weight: 800;
-  box-shadow: 0 10px 20px rgba(0, 168, 107, .22);
+  box-shadow: 0 10px 20px rgba(37, 99, 255, .22);
 }
 
 .brand strong, .brand small {
@@ -757,7 +757,7 @@ h2 {
 }
 
 .couple-widget .body.two {
-  fill: #00d084;
+  fill: #7b5cff;
 }
 
 .couple-widget.sad .body.one {
@@ -877,7 +877,7 @@ h2 {
   font-size: 21px;
 }
 
-.action-chip:nth-child(1) b { background: linear-gradient(135deg, #00d084, #00d6d6); }
+.action-chip:nth-child(1) b { background: linear-gradient(135deg, #13d8ff, #2563ff); }
 .action-chip:nth-child(2) b { background: linear-gradient(135deg, #2563ff, #7b5cff); }
 .action-chip:nth-child(3) b { background: linear-gradient(135deg, #ffbd2f, #ff4fa3); }
 .action-chip:nth-child(4) b { background: linear-gradient(135deg, #13d8ff, #2563ff); }
@@ -888,7 +888,7 @@ h2 {
 
 .action-chip:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 168, 107, .42);
+  border-color: rgba(19, 216, 255, .42);
   box-shadow: 0 20px 44px rgba(22, 52, 47, .14);
 }
 
@@ -1061,7 +1061,7 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   background:
-    radial-gradient(circle at 0% 0%, rgba(0, 208, 132, .13), transparent 34%),
+    radial-gradient(circle at 0% 0%, rgba(19, 216, 255, .13), transparent 34%),
     linear-gradient(135deg, #ffffff, #f0fcff);
 }
 
@@ -1179,8 +1179,8 @@ h2 {
   z-index: 40;
   border-radius: 22px;
   color: white;
-  background: linear-gradient(135deg, var(--green), var(--blue));
-  box-shadow: 0 20px 42px rgba(0, 120, 90, .28);
+  background: linear-gradient(135deg, var(--teal), var(--blue), var(--violet));
+  box-shadow: 0 20px 42px rgba(37, 99, 255, .28);
   font-size: 28px;
   font-weight: 900;
 }
@@ -1571,18 +1571,18 @@ h2 {
   place-items: center;
   border-radius: 18px;
   color: #061b1b;
-  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  background: linear-gradient(135deg, #13d8ff, #2563ff);
   font-size: 23px;
 }
 
 .more-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 168, 107, .34);
+  border-color: rgba(19, 216, 255, .34);
   box-shadow: 0 24px 54px rgba(7, 74, 95, .16);
 }
 
 .more-card.blue b { background: linear-gradient(135deg, #2563ff, #7b5cff); color: white; }
-.more-card.green b { background: linear-gradient(135deg, #18c37e, #13d8ff); }
+.more-card.green b { background: linear-gradient(135deg, #13d8ff, #2563ff); color: white; }
 .more-card.cyan b { background: linear-gradient(135deg, #13d8ff, #2563ff); color: white; }
 .more-card.pink b { background: linear-gradient(135deg, #ff4fa3, #7157ff); color: white; }
 .more-card.gold b { background: linear-gradient(135deg, #ffbd2f, #13d8ff); }
@@ -1641,7 +1641,7 @@ h2 {
   place-items: center;
   border-radius: 15px;
   color: #061b1b;
-  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  background: linear-gradient(135deg, #13d8ff, #2563ff);
   font-size: 15px;
 }
 
@@ -1682,7 +1682,7 @@ h2 {
   flex: 0 0 auto;
   border-radius: 11px;
   color: #061b1b;
-  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  background: linear-gradient(135deg, #13d8ff, #2563ff);
   font-weight: 900;
 }
 
@@ -1738,7 +1738,7 @@ h2 {
   place-items: center;
   border-radius: 14px;
   color: #062a3c;
-  background: linear-gradient(135deg, #00bf7a, #17a8ff);
+  background: linear-gradient(135deg, #13d8ff, #2563ff);
 }
 
 .person-avatar.two b {
@@ -1852,8 +1852,8 @@ h2 {
 
 .mode-picker button.active {
   color: white;
-  background: linear-gradient(135deg, var(--green), var(--teal));
-  box-shadow: 0 10px 20px rgba(0, 168, 107, .2);
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  box-shadow: 0 10px 20px rgba(37, 99, 255, .22);
 }
 
 .mode-picker button:hover {
@@ -1905,9 +1905,9 @@ h2 {
 
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none;
-  border-color: var(--green);
+  border-color: var(--teal);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(0, 168, 107, .14);
+  box-shadow: 0 0 0 4px rgba(19, 216, 255, .14);
 }
 
 .field textarea {
@@ -1957,7 +1957,7 @@ button:active,
 
 .primary {
   color: white;
-  background: linear-gradient(135deg, var(--green), var(--blue));
+  background: linear-gradient(135deg, var(--teal), var(--blue));
   box-shadow: 0 12px 24px rgba(20, 125, 255, .22);
 }
 
@@ -2210,7 +2210,7 @@ td.amount {
   background: rgba(255, 255, 255, .14);
 }
 
-.credit-card.Verde { background: linear-gradient(135deg, #063d34, #00a86b); }
+.credit-card.Verde { background: linear-gradient(135deg, #071225, #13d8ff); }
 .credit-card.Azul { background: linear-gradient(135deg, #071225, #2563ff); }
 .credit-card.Roxo { background: linear-gradient(135deg, #1c1748, #7b5cff); }
 .credit-card.Dourado { background: linear-gradient(135deg, #3b2a08, #ffbd2f); }
@@ -2467,7 +2467,7 @@ button.list-item {
   place-items: center;
   border-radius: 14px;
   color: #061b1b;
-  background: linear-gradient(135deg, #00d084, #0d8cff);
+  background: linear-gradient(135deg, #13d8ff, #2563ff);
 }
 
 .quick-shortcut span {
@@ -2593,7 +2593,7 @@ button.list-item {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, .11), rgba(255, 255, 255, .06)),
       rgba(22, 52, 50, .92);
-    box-shadow: inset 0 4px 0 #00e09a, 0 14px 28px rgba(0, 0, 0, .32);
+    box-shadow: inset 0 4px 0 #13d8ff, 0 14px 28px rgba(0, 0, 0, .32);
     transform: none;
   }
 
@@ -2602,9 +2602,9 @@ button.list-item {
   }
 
   .tab[data-view="entries"].active {
-    background: linear-gradient(135deg, #00bf7a 0%, #12e0b2 52%, #17a8ff 100%);
-    color: #061b1b;
-    box-shadow: 0 18px 36px rgba(0, 191, 122, .30);
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+    color: #061225;
+    box-shadow: 0 18px 36px rgba(37, 99, 255, .30);
   }
 
   .tab span {
@@ -2742,7 +2742,7 @@ button.list-item {
   }
 
   .top-status span {
-    color: #00e09a;
+    color: #13d8ff;
   }
 
   .invite-link {
@@ -2838,7 +2838,7 @@ button.list-item {
     width: 54px;
     height: 54px;
     border-radius: 18px;
-    background: linear-gradient(135deg, #00bf7a, #17a8ff);
+    background: linear-gradient(135deg, #13d8ff, #2563ff);
   }
 
   .onboarding {
@@ -3190,8 +3190,8 @@ button.list-item {
 
   .mode-picker button.active {
     color: #071b1b;
-    background: linear-gradient(135deg, #00bf7a 0%, #12e0b2 52%, #17a8ff 100%);
-    box-shadow: 0 12px 24px rgba(0, 191, 122, .25);
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+    box-shadow: 0 12px 24px rgba(37, 99, 255, .25);
   }
 
   .field {
@@ -3224,14 +3224,14 @@ button.list-item {
   .field select:focus,
   .field textarea:focus {
     background: rgba(255, 255, 255, .08);
-    border-color: #00e09a;
-    box-shadow: 0 0 0 4px rgba(0, 224, 154, .18);
+    border-color: #13d8ff;
+    box-shadow: 0 0 0 4px rgba(19, 216, 255, .18);
   }
 
   .show-password {
     min-height: 58px;
     color: #071b1b;
-    background: linear-gradient(135deg, #00bf7a, #17a8ff);
+    background: linear-gradient(135deg, #13d8ff, #2563ff);
     border-left: 0;
   }
 
@@ -3472,7 +3472,7 @@ button.list-item {
   body.app-ready .statement-icon,
   body.app-ready .notification-item > span {
     color: #061b1b;
-    background: linear-gradient(135deg, #00bf7a, #17a8ff);
+    background: linear-gradient(135deg, #13d8ff, #2563ff);
   }
 
   body.app-ready .statement-item .income {
