@@ -1,18 +1,89 @@
 :root {
-  --bg: #eefcff;
+  --bg: #eef5ff;
   --panel: #ffffff;
-  --ink: #101f2a;
-  --muted: #627281;
-  --line: #cfe8ee;
-  --green: #00d084;
-  --green-dark: #007f61;
+  --ink: #0d1728;
+  --muted: #65748a;
+  --line: #d6e2f0;
+  --green: #18c37e;
+  --green-dark: #087552;
   --red: #ff4d3d;
-  --blue: #0d8cff;
+  --blue: #2563ff;
   --gold: #ffbd2f;
-  --teal: #00d6d6;
-  --violet: #7157ff;
+  --teal: #13d8ff;
+  --violet: #7b5cff;
   --pink: #ff4fa3;
-  --shadow: 0 20px 44px rgba(7, 74, 95, .14);
+  --shadow: 0 20px 44px rgba(24, 47, 91, .14);
+}
+
+@media (min-width: 721px) {
+  body.app-ready .metric,
+  body.app-ready .panel,
+  body.app-ready .entry-form,
+  body.app-ready .settings-form,
+  body.app-ready .table-wrap,
+  body.app-ready .more-card,
+  body.app-ready .wallet-account,
+  body.app-ready .invoice-card,
+  body.app-ready .list-item,
+  body.app-ready .person-avatar,
+  body.app-ready .insight-card,
+  body.app-ready .chart-legend div,
+  body.app-ready .statement-item,
+  body.app-ready .notification-item,
+  body.app-ready .notification-item.unread {
+    color: #f6f9ff;
+    background: rgba(17, 27, 52, .90);
+    border-color: rgba(210, 226, 255, .15);
+  }
+
+  body.app-ready .helper-panel,
+  body.app-ready .soft-panel,
+  body.app-ready .salary-shortcut,
+  body.app-ready .setup-panel {
+    background:
+      radial-gradient(circle at 0 0, rgba(19, 216, 255, .10), transparent 30%),
+      rgba(17, 27, 52, .90);
+  }
+
+  body.app-ready .field input,
+  body.app-ready .field select,
+  body.app-ready .field textarea,
+  body.app-ready .password-wrap,
+  body.app-ready .field.compact,
+  body.app-ready .top-status,
+  body.app-ready .notif-button,
+  body.app-ready .mode-picker {
+    color: #f6f9ff;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(210, 226, 255, .15);
+  }
+
+  body.app-ready .field input:focus,
+  body.app-ready .field select:focus,
+  body.app-ready .field textarea:focus {
+    background: rgba(255, 255, 255, .10);
+    border-color: #13d8ff;
+    box-shadow: 0 0 0 4px rgba(19, 216, 255, .16);
+  }
+
+  body.app-ready .wallet-account-money,
+  body.app-ready .invoice-items span,
+  body.app-ready .track {
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(210, 226, 255, .14);
+  }
+
+  body.app-ready .mode-picker button.active,
+  body.app-ready .primary {
+    color: #071225;
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+  }
+
+  body.app-ready .statement-icon,
+  body.app-ready .notification-item > span {
+    color: #071225;
+    background: linear-gradient(135deg, #13d8ff, #2563ff);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -22,10 +93,10 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at 18% 0%, rgba(0, 214, 214, .22), transparent 30%),
+    radial-gradient(circle at 18% 0%, rgba(19, 216, 255, .22), transparent 30%),
     radial-gradient(circle at 86% 8%, rgba(255, 189, 47, .18), transparent 28%),
-    radial-gradient(circle at 48% 0%, rgba(255, 79, 163, .12), transparent 26%),
-    linear-gradient(180deg, #e7fcff 0, var(--bg) 300px),
+    radial-gradient(circle at 48% 0%, rgba(123, 92, 255, .12), transparent 26%),
+    linear-gradient(180deg, #eaf2ff 0, var(--bg) 300px),
     var(--bg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   display: grid;
@@ -95,7 +166,7 @@ body.app-ready .auth-screen {
   background:
     radial-gradient(circle at 85% 18%, rgba(255, 224, 113, .38), transparent 24%),
     radial-gradient(circle at 18% 80%, rgba(255, 79, 139, .28), transparent 26%),
-    linear-gradient(135deg, #072d47 0%, #00bf7a 54%, #147dff 118%);
+    linear-gradient(135deg, #071225 0%, #2563ff 54%, #7b5cff 118%);
 }
 
 .login-hero .brand {
@@ -182,7 +253,7 @@ body.app-ready .auth-screen {
   min-height: 42px;
   padding: 0 12px;
   color: var(--blue);
-  background: #e8f8ff;
+  background: #edf4ff;
   border-left: 1px solid var(--line);
   font-weight: 800;
 }
@@ -224,9 +295,9 @@ button {
 
 .sidebar {
   background:
-    radial-gradient(circle at 20% 12%, rgba(0, 214, 214, .24), transparent 28%),
+    radial-gradient(circle at 20% 12%, rgba(19, 216, 255, .22), transparent 28%),
     radial-gradient(circle at 84% 40%, rgba(255, 189, 47, .12), transparent 24%),
-    linear-gradient(180deg, #051c30 0%, #063d36 48%, #071f3c 100%);
+    linear-gradient(180deg, #071225 0%, #0b2247 48%, #120c2f 100%);
   color: white;
   min-height: 100vh;
   padding: 22px 14px;
@@ -247,8 +318,8 @@ button {
   height: 42px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #ffcf43, #00e09a, #35a7ff);
-  color: #062a3c;
+  background: linear-gradient(135deg, #ffbd2f, #13d8ff, #7b5cff);
+  color: #071225;
   border-radius: 8px;
   font-weight: 800;
   box-shadow: 0 10px 20px rgba(0, 168, 107, .22);
@@ -525,6 +596,60 @@ h2 {
   margin-top: 4px;
 }
 
+.app-toast {
+  min-width: min(360px, calc(100vw - 32px));
+  max-width: min(460px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 120;
+  padding: 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(18, 38, 43, .22);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(18px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-toast b {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #061b1b;
+  background: linear-gradient(135deg, var(--green), var(--teal));
+  font-weight: 900;
+}
+
+.app-toast span {
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.app-toast.info b {
+  color: white;
+  background: linear-gradient(135deg, var(--blue), var(--violet));
+}
+
+.app-toast.error b {
+  color: white;
+  background: linear-gradient(135deg, var(--red), #ff8a3d);
+}
+
 .dot {
   width: 9px;
   height: 9px;
@@ -557,10 +682,10 @@ h2 {
   color: white;
   border-radius: 18px;
   background:
-    radial-gradient(circle at 88% 16%, rgba(255, 224, 113, .46), transparent 24%),
-    radial-gradient(circle at 18% 80%, rgba(255, 79, 163, .28), transparent 27%),
-    linear-gradient(135deg, #071f3d 0%, #00d084 48%, #0d8cff 112%);
-  box-shadow: 0 24px 52px rgba(13, 140, 255, .22);
+    radial-gradient(circle at 88% 16%, rgba(255, 189, 47, .42), transparent 24%),
+    radial-gradient(circle at 18% 80%, rgba(19, 216, 255, .26), transparent 27%),
+    linear-gradient(135deg, #071225 0%, #193a8a 48%, #7b5cff 112%);
+  box-shadow: 0 24px 52px rgba(37, 99, 255, .22);
   overflow: hidden;
   position: relative;
 }
@@ -753,9 +878,9 @@ h2 {
 }
 
 .action-chip:nth-child(1) b { background: linear-gradient(135deg, #00d084, #00d6d6); }
-.action-chip:nth-child(2) b { background: linear-gradient(135deg, #0d8cff, #7157ff); }
+.action-chip:nth-child(2) b { background: linear-gradient(135deg, #2563ff, #7b5cff); }
 .action-chip:nth-child(3) b { background: linear-gradient(135deg, #ffbd2f, #ff4fa3); }
-.action-chip:nth-child(4) b { background: linear-gradient(135deg, #00d6d6, #0d8cff); }
+.action-chip:nth-child(4) b { background: linear-gradient(135deg, #13d8ff, #2563ff); }
 
 .action-chip span {
   font-weight: 800;
@@ -863,19 +988,26 @@ h2 {
 .feature-hero.entries-hero {
   background:
     radial-gradient(circle at 88% 18%, rgba(255, 189, 47, .35), transparent 28%),
-    linear-gradient(135deg, #071f3d 0%, #00a970 54%, #0d8cff 112%);
+    linear-gradient(135deg, #071225 0%, #193a8a 54%, #13d8ff 112%);
 }
 
 .feature-hero.fixed-hero {
   background:
     radial-gradient(circle at 88% 18%, rgba(255, 79, 163, .26), transparent 28%),
-    linear-gradient(135deg, #132344 0%, #006b5d 54%, #ffbd2f 132%);
+    linear-gradient(135deg, #101832 0%, #4c2d95 54%, #ffbd2f 132%);
 }
 
 .feature-hero.cards-hero {
   background:
     radial-gradient(circle at 88% 18%, rgba(0, 214, 214, .34), transparent 28%),
-    linear-gradient(135deg, #101b3d 0%, #7157ff 48%, #0d8cff 112%);
+    linear-gradient(135deg, #101832 0%, #7b5cff 48%, #2563ff 112%);
+}
+
+.feature-hero.goals-hero {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 189, 47, .30), transparent 28%),
+    radial-gradient(circle at 12% 86%, rgba(255, 79, 163, .24), transparent 26%),
+    linear-gradient(135deg, #101832 0%, #4c2d95 48%, #ff4fa3 125%);
 }
 
 .feature-hero span,
@@ -1378,9 +1510,9 @@ h2 {
   border-radius: 22px;
   background:
     radial-gradient(circle at 86% 14%, rgba(255, 189, 47, .38), transparent 28%),
-    radial-gradient(circle at 16% 90%, rgba(255, 79, 163, .22), transparent 28%),
-    linear-gradient(135deg, #061f3a 0%, #007f61 55%, #0d8cff 115%);
-  box-shadow: 0 24px 52px rgba(13, 140, 255, .20);
+    radial-gradient(circle at 16% 90%, rgba(19, 216, 255, .24), transparent 28%),
+    linear-gradient(135deg, #071225 0%, #193a8a 55%, #7b5cff 115%);
+  box-shadow: 0 24px 52px rgba(37, 99, 255, .20);
 }
 
 .more-hero span,
@@ -1449,12 +1581,12 @@ h2 {
   box-shadow: 0 24px 54px rgba(7, 74, 95, .16);
 }
 
-.more-card.blue b { background: linear-gradient(135deg, #0d8cff, #7157ff); color: white; }
-.more-card.green b { background: linear-gradient(135deg, #00d084, #00d6d6); }
-.more-card.cyan b { background: linear-gradient(135deg, #00d6d6, #0d8cff); color: white; }
+.more-card.blue b { background: linear-gradient(135deg, #2563ff, #7b5cff); color: white; }
+.more-card.green b { background: linear-gradient(135deg, #18c37e, #13d8ff); }
+.more-card.cyan b { background: linear-gradient(135deg, #13d8ff, #2563ff); color: white; }
 .more-card.pink b { background: linear-gradient(135deg, #ff4fa3, #7157ff); color: white; }
-.more-card.gold b { background: linear-gradient(135deg, #ffbd2f, #00d084); }
-.more-card.violet b { background: linear-gradient(135deg, #7157ff, #0d8cff); color: white; }
+.more-card.gold b { background: linear-gradient(135deg, #ffbd2f, #13d8ff); }
+.more-card.violet b { background: linear-gradient(135deg, #7b5cff, #2563ff); color: white; }
 
 .more-card strong,
 .more-card small {
@@ -1802,6 +1934,27 @@ h2 {
   transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
 }
 
+button:active,
+.tab:active,
+.more-card:active,
+.action-chip:active,
+.quick-shortcut:active,
+.setup-step:active {
+  transform: scale(.98);
+}
+
+.panel,
+.metric,
+.entry-form,
+.settings-form,
+.table-wrap,
+.more-card,
+.invoice-card,
+.wallet-account,
+.credit-card {
+  will-change: transform;
+}
+
 .primary {
   color: white;
   background: linear-gradient(135deg, var(--green), var(--blue));
@@ -2058,10 +2211,10 @@ td.amount {
 }
 
 .credit-card.Verde { background: linear-gradient(135deg, #063d34, #00a86b); }
-.credit-card.Azul { background: linear-gradient(135deg, #083261, #1677ff); }
-.credit-card.Roxo { background: linear-gradient(135deg, #2d236d, #8a63ff); }
-.credit-card.Dourado { background: linear-gradient(135deg, #6d4300, #f4a51c); }
-.credit-card.Preto { background: linear-gradient(135deg, #11181a, #394648); }
+.credit-card.Azul { background: linear-gradient(135deg, #071225, #2563ff); }
+.credit-card.Roxo { background: linear-gradient(135deg, #1c1748, #7b5cff); }
+.credit-card.Dourado { background: linear-gradient(135deg, #3b2a08, #ffbd2f); }
+.credit-card.Preto { background: linear-gradient(135deg, #060b17, #25314f); }
 
 .credit-card span {
   color: rgba(255, 255, 255, .72);
@@ -2102,6 +2255,102 @@ td.amount {
   background: rgba(255, 255, 255, .18);
   color: white;
   box-shadow: none;
+}
+
+@media (min-width: 721px) {
+  body {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(19, 216, 255, .14), transparent 32%),
+      radial-gradient(circle at 88% 10%, rgba(123, 92, 255, .16), transparent 32%),
+      linear-gradient(180deg, #060b17 0%, #071225 42%, #090d20 100%);
+    color: #f6f9ff;
+  }
+
+  .shell {
+    background: transparent;
+  }
+
+  .topbar {
+    color: #f6f9ff;
+  }
+
+  .eyebrow,
+  .brand small,
+  .mobile-app-brand small {
+    color: #b8c5db;
+  }
+
+  .metric,
+  .panel,
+  .entry-form,
+  .settings-form,
+  .table-wrap,
+  .more-card,
+  .wallet-account,
+  .invoice-card {
+    color: #f6f9ff;
+    background: rgba(17, 27, 52, .88);
+    border-color: rgba(210, 226, 255, .14);
+    box-shadow: 0 24px 58px rgba(0, 0, 0, .28);
+    backdrop-filter: blur(14px);
+  }
+
+  .helper-panel,
+  .soft-panel,
+  .salary-shortcut,
+  .setup-panel {
+    background:
+      radial-gradient(circle at 0 0, rgba(19, 216, 255, .10), transparent 30%),
+      rgba(17, 27, 52, .88);
+  }
+
+  .field input,
+  .field select,
+  .field textarea,
+  .password-wrap {
+    color: #f6f9ff;
+    background: rgba(255, 255, 255, .06);
+    border-color: rgba(210, 226, 255, .16);
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    background: rgba(255, 255, 255, .09);
+    border-color: #13d8ff;
+    box-shadow: 0 0 0 4px rgba(19, 216, 255, .15);
+  }
+
+  .mode-picker,
+  .top-status,
+  .notif-button,
+  .list-item,
+  .person-avatar,
+  .insight-card,
+  .chart-legend div,
+  .wallet-account-money,
+  .invoice-items span {
+    color: #f6f9ff;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(210, 226, 255, .13);
+  }
+
+  .mode-picker button.active,
+  .primary {
+    color: #071225;
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+    box-shadow: 0 16px 34px rgba(37, 99, 255, .30);
+  }
+
+  .ghost {
+    color: #f6f9ff;
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(210, 226, 255, .13);
+  }
+
+  .track {
+    background: rgba(255, 255, 255, .13);
+  }
 }
 
 .list-item {
@@ -2268,11 +2517,11 @@ button.list-item {
 
 @media (max-width: 720px) {
   :root {
-    --bg: #061b1b;
-    --panel: #103533;
+    --bg: #071225;
+    --panel: #111b34;
     --ink: #f2fff9;
-    --muted: #a8c8c2;
-    --line: rgba(183, 255, 238, .16);
+    --muted: #b8c5db;
+    --line: rgba(210, 226, 255, .16);
     --shadow: 0 22px 46px rgba(0, 0, 0, .28);
   }
 
@@ -2282,9 +2531,9 @@ button.list-item {
     min-height: 100vh;
     padding-bottom: 104px;
     background:
-      radial-gradient(circle at 82% 8%, rgba(0, 194, 199, .22), transparent 28%),
-      radial-gradient(circle at 8% 24%, rgba(0, 191, 122, .18), transparent 28%),
-      linear-gradient(180deg, #071313 0%, #082525 34%, #071b1b 100%);
+      radial-gradient(circle at 82% 8%, rgba(19, 216, 255, .20), transparent 28%),
+      radial-gradient(circle at 8% 24%, rgba(123, 92, 255, .20), transparent 28%),
+      linear-gradient(180deg, #060b17 0%, #071225 42%, #090d20 100%);
     color: var(--ink);
   }
 
@@ -2304,7 +2553,7 @@ button.list-item {
     border: 1px solid rgba(183, 255, 238, .12);
     border-bottom: 0;
     border-radius: 28px 28px 0 0;
-    background: rgba(4, 27, 27, .96);
+    background: rgba(6, 11, 23, .96);
     box-shadow: 0 -22px 48px rgba(0, 0, 0, .42);
     backdrop-filter: blur(14px);
   }
@@ -2387,9 +2636,9 @@ button.list-item {
     margin-bottom: 0;
     padding: 24px 28px 20px;
     background:
-      radial-gradient(circle at 82% 16%, rgba(0, 194, 199, .18), transparent 30%),
-      linear-gradient(180deg, #071313 0%, #082727 100%);
-    border-bottom: 1px solid rgba(183, 255, 238, .10);
+      radial-gradient(circle at 82% 16%, rgba(19, 216, 255, .18), transparent 30%),
+      linear-gradient(180deg, #060b17 0%, #071225 100%);
+    border-bottom: 1px solid rgba(210, 226, 255, .10);
   }
 
   body.app-ready:not([data-view="dashboard"]) .topbar {
@@ -2571,6 +2820,18 @@ button.list-item {
     color: #061b1b;
   }
 
+  .app-toast {
+    left: 16px;
+    right: 16px;
+    bottom: calc(112px + env(safe-area-inset-bottom));
+    min-width: 0;
+    max-width: none;
+    color: #f2fff9;
+    background: rgba(8, 37, 37, .96);
+    border-color: rgba(183, 255, 238, .18);
+    box-shadow: 0 22px 52px rgba(0, 0, 0, .42);
+  }
+
   .fab {
     right: 18px;
     bottom: 104px;
@@ -2738,9 +2999,9 @@ button.list-item {
     overflow: hidden;
     border: 1px solid rgba(183, 255, 238, .16);
     background:
-      radial-gradient(circle at 78% 14%, rgba(21, 225, 174, .35), transparent 30%),
-      radial-gradient(circle at 22% 90%, rgba(23, 168, 255, .22), transparent 32%),
-      linear-gradient(145deg, #08243f 0%, #087866 48%, #06b49a 100%);
+      radial-gradient(circle at 78% 14%, rgba(19, 216, 255, .28), transparent 30%),
+      radial-gradient(circle at 22% 90%, rgba(255, 189, 47, .18), transparent 32%),
+      linear-gradient(145deg, #071225 0%, #193a8a 48%, #7b5cff 100%);
   }
 
   .balance-card strong {
@@ -2984,9 +3245,9 @@ button.list-item {
   }
 
   .primary {
-    color: #061b1b;
-    background: linear-gradient(135deg, #00bf7a 0%, #12e0b2 52%, #17a8ff 100%);
-    box-shadow: 0 16px 34px rgba(0, 191, 122, .28);
+    color: #061225;
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+    box-shadow: 0 16px 34px rgba(37, 99, 255, .30);
   }
 
   .ghost {
@@ -3240,5 +3501,76 @@ button.list-item {
 
   body.app-ready .empty span {
     color: #b9d7d1;
+  }
+}
+
+@media (min-width: 721px) {
+  body.app-ready .metric,
+  body.app-ready .panel,
+  body.app-ready .entry-form,
+  body.app-ready .settings-form,
+  body.app-ready .table-wrap,
+  body.app-ready .more-card,
+  body.app-ready .wallet-account,
+  body.app-ready .invoice-card,
+  body.app-ready .list-item,
+  body.app-ready .person-avatar,
+  body.app-ready .insight-card,
+  body.app-ready .chart-legend div,
+  body.app-ready .statement-item,
+  body.app-ready .notification-item,
+  body.app-ready .notification-item.unread {
+    color: #f6f9ff;
+    background: rgba(17, 27, 52, .90);
+    border-color: rgba(210, 226, 255, .15);
+  }
+
+  body.app-ready .helper-panel,
+  body.app-ready .soft-panel,
+  body.app-ready .salary-shortcut,
+  body.app-ready .setup-panel {
+    background:
+      radial-gradient(circle at 0 0, rgba(19, 216, 255, .10), transparent 30%),
+      rgba(17, 27, 52, .90);
+  }
+
+  body.app-ready .field input,
+  body.app-ready .field select,
+  body.app-ready .field textarea,
+  body.app-ready .password-wrap,
+  body.app-ready .field.compact,
+  body.app-ready .top-status,
+  body.app-ready .notif-button,
+  body.app-ready .mode-picker {
+    color: #f6f9ff;
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(210, 226, 255, .15);
+  }
+
+  body.app-ready .field input:focus,
+  body.app-ready .field select:focus,
+  body.app-ready .field textarea:focus {
+    background: rgba(255, 255, 255, .10);
+    border-color: #13d8ff;
+    box-shadow: 0 0 0 4px rgba(19, 216, 255, .16);
+  }
+
+  body.app-ready .wallet-account-money,
+  body.app-ready .invoice-items span,
+  body.app-ready .track {
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(210, 226, 255, .14);
+  }
+
+  body.app-ready .mode-picker button.active,
+  body.app-ready .primary {
+    color: #071225;
+    background: linear-gradient(135deg, #13d8ff 0%, #2563ff 52%, #7b5cff 100%);
+  }
+
+  body.app-ready .statement-icon,
+  body.app-ready .notification-item > span {
+    color: #071225;
+    background: linear-gradient(135deg, #13d8ff, #2563ff);
   }
 }

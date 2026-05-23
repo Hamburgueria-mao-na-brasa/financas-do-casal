@@ -1,11 +1,11 @@
 {
-  "name": "Finanças do Casal",
-  "short_name": "Finanças",
-  "description": "Controle financeiro de casal baseado na planilha original.",
+  "name": "DuoFin",
+  "short_name": "DuoFin",
+  "description": "Controle financeiro compartilhado para casal.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f6f4ef",
-  "theme_color": "#25302f",
+  "background_color": "#071225",
+  "theme_color": "#071225",
   "icons": [
     {
       "src": "app-icon.svg",

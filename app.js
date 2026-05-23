@@ -48,6 +48,7 @@ let entryFilter = "Todos";
 let statementFilter = "Todos";
 let statementSearch = "";
 let confirmAction = null;
+let toastTimer = null;
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
@@ -111,6 +112,7 @@ function saveState(sync = false) {
 async function commitState() {
   saveState(false);
   if (cloudReady && householdId) await saveCloudState();
+  else showToast("Salvo neste aparelho", "success");
   render();
 }
 
@@ -319,8 +321,8 @@ function renderGate(message = "") {
       <div class="auth-card fintech-login">
         <div class="login-hero">
           <div class="brand">
-            <span class="brand-mark">FC</span>
-            <div><strong>Finanças do Casal</strong><small>Conta compartilhada</small></div>
+            <span class="brand-mark">DF</span>
+            <div><strong>DuoFin</strong><small>Finanças do casal</small></div>
           </div>
           <div class="login-balance-preview">
             <span>Saldo organizado</span>
@@ -357,8 +359,8 @@ function renderGate(message = "") {
     auth.innerHTML = `
       <div class="auth-card">
         <div class="brand">
-          <span class="brand-mark">FC</span>
-          <div><strong>Finanças do Casal</strong><small>${currentUser.email}</small></div>
+          <span class="brand-mark">DF</span>
+          <div><strong>DuoFin</strong><small>${currentUser.email}</small></div>
         </div>
         <h1>Criar nova senha</h1>
         <p>Defina uma senha para entrar direto na sua conta das próximas vezes.</p>
@@ -379,8 +381,8 @@ function renderGate(message = "") {
     auth.innerHTML = `
       <div class="auth-card">
         <div class="brand">
-          <span class="brand-mark">FC</span>
-          <div><strong>Finanças do Casal</strong><small>${currentUser.email}</small></div>
+          <span class="brand-mark">DF</span>
+          <div><strong>DuoFin</strong><small>${currentUser.email}</small></div>
         </div>
         ${invite ? `
           <h1>Confirmar convite</h1>
@@ -460,7 +462,7 @@ function currentActor() {
   return currentUser?.email?.split("@")[0] || "Alguém";
 }
 
-function notify(type, text, view = "") {
+function notify(type, text, view = "", visible = true) {
   ensureStateShape();
   state.notifications.unshift({
     id: crypto.randomUUID(),
@@ -472,13 +474,30 @@ function notify(type, text, view = "") {
     read: false
   });
   state.notifications = state.notifications.slice(0, 30);
+  if (visible) showToast(text, type === "card" ? "info" : "success");
 }
 
 function smartNotify(key, type, text, view = "") {
   const scopedKey = `${state.selectedMonth}:${key}`;
   if (state.notificationMarks[scopedKey]) return;
   state.notificationMarks[scopedKey] = true;
-  notify(type, text, view);
+  notify(type, text, view, false);
+}
+
+function showToast(text, tone = "success") {
+  if (!text || !document.body) return;
+  let toast = qs("#app-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "app-toast";
+    toast.className = "app-toast";
+    document.body.appendChild(toast);
+  }
+  const icon = tone === "error" ? "!" : tone === "info" ? "i" : "✓";
+  toast.className = `app-toast ${tone} show`;
+  toast.innerHTML = `<b>${icon}</b><span>${text}</span>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
 function notificationTarget(type, text = "") {
@@ -1041,6 +1060,7 @@ async function saveCloudState() {
   });
   if (error) {
     syncStatus = `Erro ao salvar: ${error.message}`;
+    showToast(syncStatus, "error");
     renderCloudPanel();
     return;
   }
@@ -1052,6 +1072,7 @@ async function saveCloudState() {
     .single();
   if (!readError) lastCloudUpdatedAt = saved.updated_at;
   syncStatus = readError ? `Salvo, mas não conferido: ${readError.message}` : `Salvo ${formatSyncTime(saved.updated_at)}`;
+  showToast(readError ? "Salvo, mas não consegui conferir a nuvem" : "Salvo na nuvem", readError ? "info" : "success");
   renderCloudPanel();
 }
 
@@ -2377,8 +2398,24 @@ function renderMethod() {
 }
 
 function renderGoals() {
+  const savedTotal = total((state.goals || []).map((goal) => ({ value: goal.saved })));
+  const targetTotal = total((state.goals || []).map((goal) => ({ value: goal.target })));
+  const doneCount = state.goals.filter((goal) => goal.status === "Concluído" || Number(goal.saved || 0) >= Number(goal.target || 0)).length;
   qs("#goals").innerHTML = `
+    <section class="feature-hero goals-hero">
+      <div>
+        <span>Planos do casal</span>
+        <h2>Metas financeiras</h2>
+        <p>Guarde dinheiro para objetivos importantes e acompanhe o progresso sem virar planilha.</p>
+      </div>
+      <div class="feature-stats">
+        <div><span>Guardado</span><strong>${formatMoney(savedTotal)}</strong></div>
+        <div><span>Objetivo total</span><strong>${formatMoney(targetTotal)}</strong></div>
+        <div><span>Concluídas</span><strong>${doneCount}</strong></div>
+      </div>
+    </section>
     <form class="entry-form" id="goal-form">
+      <div class="span-3 form-heading"><span>◇</span><div><h2>Nova meta</h2><small>Defina o objetivo e quanto já foi guardado.</small></div></div>
       ${input("title", "Objetivo", "text", "")}
       ${input("target", "Valor da meta", "number", "", "0.01")}
       ${input("saved", "Valor acumulado", "number", "0", "0.01")}
@@ -2386,7 +2423,7 @@ function renderGoals() {
       ${select("status", "Status", ["Em progresso", "Concluído", "Pausado"])}
       <button class="primary" type="submit">Adicionar</button>
     </form>
-    <div class="grid-3">${state.goals.length ? state.goals.map(goalCard).join("") : emptyHtml()}</div>
+    <div class="grid-3 compact-goals">${state.goals.length ? state.goals.map(goalCard).join("") : emptyHtml()}</div>
   `;
   qs("#goal-form").addEventListener("submit", addGoal);
 }
