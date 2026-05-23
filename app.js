@@ -5,6 +5,7 @@ const cloud = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const seed = {
   selectedMonth: "junho",
+  selectedYear: new Date().getFullYear(),
   categoriesIncome: ["💸 Salário", "💵 Renda Extra", "👜 Venda de Produto", "🔧 Serviços Prestados", "💸 13º Salário", "📆 Férias / Rescisão", "💰 Pix Recebido", "↩ Reembolso / Estorno", "📊 Investimentos / Rendimentos"],
   categoriesExpense: ["🍌 Alimentação", "🍔 Restaurantes / Lanches", "🏠 Aluguel / Condomínio", "⚡ Energia", "💧 Água", "📞 Internet / Celular", "🚓 Transporte", "💳 Cartão de Crédito", "🌍 Lazer / Viagens", "💊 Saúde", "👩‍🎓 Educação", "🥼 Roupas / Calçados", "🎁 Presentes", "🔨 Manutenção da Casa", "🧾 Compras Parceladas", "📈 Impostos / Taxas"],
   paymentTypes: ["Dinheiro", "Cartão de Crédito", "Cartão de Débito", "Pix", "Transferência Bancária", "Boleto", "Débito Automático", "Cheque", "Vale-Alimentação", "Vale-Refeição"],
@@ -71,10 +72,12 @@ function loadState() {
 function blankState() {
   const fresh = structuredClone(seed);
   fresh.selectedMonth = months[new Date().getMonth()];
+  fresh.selectedYear = new Date().getFullYear();
   return fresh;
 }
 
 function ensureStateShape() {
+  state.selectedYear ||= new Date().getFullYear();
   state.notifications ||= [];
   state.accounts ||= [];
   state.cards ||= [];
@@ -111,8 +114,14 @@ async function commitState() {
   render();
 }
 
-function byMonth(items, month = state.selectedMonth) {
-  return items.filter((item) => item.month === month);
+function byMonth(items, month = state.selectedMonth, year = state.selectedYear) {
+  return items.filter((item) => {
+    if (item.month !== month) return false;
+    if (!item.date) return true;
+    const date = new Date(`${item.date}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return true;
+    return date.getUTCFullYear() === Number(year);
+  });
 }
 
 function total(items) {
@@ -123,13 +132,21 @@ function monthIndex(month) {
   return months.indexOf(month.toLowerCase());
 }
 
+function periodKey(month = state.selectedMonth, year = state.selectedYear) {
+  return `${year}:${month}`;
+}
+
 function getInstallmentSchedule(item) {
   const start = monthIndex(item.firstMonth);
   const perPart = Number(item.value || 0) / Number(item.parts || 1);
+  const purchaseDate = new Date(`${item.date || ""}T00:00:00Z`);
+  const purchaseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
+  const firstYear = Number(item.firstYear || purchaseYear);
   return Array.from({ length: Number(item.parts || 1) }, (_, index) => ({
     month: months[(start + index) % 12],
+    year: firstYear + Math.floor((start + index) / 12),
     value: perPart,
-    paid: item.paidMonths.includes(months[(start + index) % 12])
+    paid: isPeriodPaid(item, months[(start + index) % 12], firstYear + Math.floor((start + index) / 12))
   }));
 }
 
@@ -143,48 +160,58 @@ function invoiceMonthForPurchase(dateValue, cardName) {
 }
 
 function cardTotals(cardName) {
-  const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
+  const selectedIndex = monthIndex(state.selectedMonth);
+  const nextMonth = months[(selectedIndex + 1) % 12];
+  const nextYear = Number(state.selectedYear || new Date().getFullYear()) + (selectedIndex === 11 ? 1 : 0);
   const scheduled = state.installments
     .filter((item) => item.card === cardName)
     .flatMap(getInstallmentSchedule);
   const recurring = state.cardRecurring
     .filter((item) => item.card === cardName && item.active !== false)
-    .map((item) => ({ month: state.selectedMonth, value: Number(item.value || 0), paid: (item.paidMonths || []).includes(state.selectedMonth) }));
+    .map((item) => ({ month: state.selectedMonth, value: Number(item.value || 0), paid: isPeriodPaid(item) }));
   const recurringNext = state.cardRecurring
-    .filter((item) => item.card === cardName && item.active !== false && !(item.paidMonths || []).includes(nextMonth))
+    .filter((item) => item.card === cardName && item.active !== false && !isPeriodPaid(item, nextMonth, nextYear))
     .map((item) => ({ value: Number(item.value || 0) }));
   const open = scheduled.filter((part) => !part.paid);
   const recurringOpen = recurring.filter((part) => !part.paid);
   const monthOpen = [
-    ...open.filter((part) => part.month === state.selectedMonth),
+    ...open.filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear)),
     ...recurringOpen
   ];
   return {
     used: total(open) + total(recurringOpen),
     month: total(monthOpen),
-    next: total(open.filter((part) => part.month === nextMonth)) + total(recurringNext)
+    next: total(open.filter((part) => part.month === nextMonth && Number(part.year) === Number(nextYear))) + total(recurringNext)
   };
 }
 
-function isFixedPaid(item, month = state.selectedMonth) {
-  return (item.paidMonths || []).includes(month);
+function isFixedPaid(item, month = state.selectedMonth, year = state.selectedYear) {
+  const paid = item.paidMonths || [];
+  return paid.includes(periodKey(month, year)) || paid.includes(month);
+}
+
+function isPeriodPaid(item, month = state.selectedMonth, year = state.selectedYear) {
+  const paid = item.paidMonths || [];
+  return paid.includes(periodKey(month, year)) || paid.includes(month);
 }
 
 function salaryPlannedTotal() {
   return Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
 }
 
-function isSalaryAvailable(day, month = state.selectedMonth) {
+function isSalaryAvailable(day, month = state.selectedMonth, year = state.selectedYear) {
   const now = new Date();
   const selectedIndex = monthIndex(month);
+  if (Number(year) < now.getFullYear()) return true;
+  if (Number(year) > now.getFullYear()) return false;
   if (selectedIndex < now.getMonth()) return true;
   if (selectedIndex > now.getMonth()) return false;
   return now.getDate() >= Number(day || 1);
 }
 
-function availableSalaryTotal(month = state.selectedMonth) {
-  const one = isSalaryAvailable(state.profile.salaryDayOne, month) ? Number(state.profile.salaryOne || 0) : 0;
-  const two = isSalaryAvailable(state.profile.salaryDayTwo, month) ? Number(state.profile.salaryTwo || 0) : 0;
+function availableSalaryTotal(month = state.selectedMonth, year = state.selectedYear) {
+  const one = isSalaryAvailable(state.profile.salaryDayOne, month, year) ? Number(state.profile.salaryOne || 0) : 0;
+  const two = isSalaryAvailable(state.profile.salaryDayTwo, month, year) ? Number(state.profile.salaryTwo || 0) : 0;
   return one + two;
 }
 
@@ -681,6 +708,9 @@ function saveEditModal(event) {
   if (data.kind === "installment") {
     const item = state.installments.find((installment) => installment.id === data.id);
     if (item) {
+      const purchaseDate = new Date(`${data.date}T00:00:00Z`);
+      const purchaseMonthIndex = Number.isNaN(purchaseDate.getTime()) ? monthIndex(data.firstMonth) : purchaseDate.getUTCMonth();
+      const firstYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear() + (monthIndex(data.firstMonth) < purchaseMonthIndex ? 1 : 0);
       Object.assign(item, {
         date: data.date,
         card: data.card,
@@ -688,7 +718,8 @@ function saveEditModal(event) {
         category: data.category,
         value: Number(data.value || 0),
         parts: Math.max(1, Number(data.parts || 1)),
-        firstMonth: data.firstMonth
+        firstMonth: data.firstMonth,
+        firstYear
       });
     }
   }
@@ -1064,7 +1095,21 @@ async function initCloud() {
 
 function renderMonthFilter() {
   const select = qs("#month-filter");
+  if (select && !qs("#year-filter")) {
+    select.closest("label")?.insertAdjacentHTML("afterend", `
+      <label class="field compact year-compact">
+        <span>Ano</span>
+        <select id="year-filter"></select>
+      </label>
+    `);
+  }
+  const yearSelect = qs("#year-filter");
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 7 }, (_, index) => currentYear - 3 + index);
   select.innerHTML = months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("");
+  if (yearSelect) {
+    yearSelect.innerHTML = years.map((year) => `<option value="${year}" ${Number(state.selectedYear) === year ? "selected" : ""}>${year}</option>`).join("");
+  }
 }
 
 function ensureMoreNavigation() {
@@ -1104,7 +1149,7 @@ function renderDashboard() {
         <div>
           <span>Saldo do mês</span>
           <strong>${formatMoney(summary.balance)}</strong>
-          <small>${state.selectedMonth} · Conta compartilhada</small>
+          <small>${state.selectedMonth} de ${state.selectedYear} · Conta compartilhada</small>
           <p class="mood-message">${mood.message}</p>
         </div>
         ${coupleIllustration(mood)}
@@ -1307,7 +1352,7 @@ function monthlyReport() {
 function fixedBillsWithDueInfo() {
   const now = new Date();
   const selectedIndex = monthIndex(state.selectedMonth);
-  const selectedYear = selectedIndex < now.getMonth() ? now.getFullYear() + 1 : now.getFullYear();
+  const selectedYear = Number(state.selectedYear || now.getFullYear());
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   return [...(state.fixedBills || [])].map((item) => {
     const dueDate = new Date(selectedYear, selectedIndex, Math.min(Number(item.dueDay || 1), 28));
@@ -1411,8 +1456,7 @@ function todaySummary() {
 }
 
 function fixedToPendingEntry(item) {
-  const year = new Date().getFullYear();
-  const date = new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+  const date = new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
   return {
     date,
     category: item.category,
@@ -1696,7 +1740,7 @@ function accountOptions() {
 
 function renderStatement() {
   let rows = [
-    ...state.entries.map((item) => ({
+    ...byMonth(state.entries).map((item) => ({
       id: item.id,
       kind: item.type === "Receita" ? "Entrada" : "Saída",
       date: item.date,
@@ -1707,7 +1751,7 @@ function renderStatement() {
       action: `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
     })),
     ...state.installments.flatMap((item) => getInstallmentSchedule(item)
-      .filter((part) => part.month === state.selectedMonth)
+      .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))
       .map((part, index) => ({
         id: `${item.id}-${index}`,
         kind: "Cartão",
@@ -1716,17 +1760,17 @@ function renderStatement() {
         detail: `${item.card} · parcela ${index + 1}/${item.parts} · ${part.paid ? "Pago" : "Aberto"}`,
         value: Number(part.value || 0),
         tone: "card",
-        action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
+        action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}|${part.year}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
       }))),
     ...state.cardRecurring.filter((item) => item.active !== false).map((item) => ({
       id: item.id,
       kind: "Cartão",
       date: recurringCardDateForMonth(item),
       title: item.description,
-      detail: `${item.card} · cobrança fixa · ${(item.paidMonths || []).includes(state.selectedMonth) ? "Pago" : "Aberto"}`,
+      detail: `${item.card} · cobrança fixa · ${isPeriodPaid(item) ? "Pago" : "Aberto"}`,
       value: Number(item.value || 0),
       tone: "card",
-      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${(item.paidMonths || []).includes(state.selectedMonth) ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
+      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${isPeriodPaid(item) ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
     })),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
@@ -1750,7 +1794,7 @@ function renderStatement() {
   qs("#statement").innerHTML = `
     <div class="panel helper-panel">
       <h2>Extrato do mês</h2>
-      <p>Veja tudo que foi lançado em ${state.selectedMonth}: entradas, saídas, faturas e contas fixas. Se marcou algo errado, altere aqui.</p>
+      <p>Veja tudo que foi lançado em ${state.selectedMonth} de ${state.selectedYear}: entradas, saídas, faturas e contas fixas. Se marcou algo errado, altere aqui.</p>
     </div>
     <div class="statement-tools panel">
       <label class="field">
@@ -1800,13 +1844,11 @@ function statementDayGroup(date, items) {
 }
 
 function fixedDateForMonth(item) {
-  const year = new Date().getFullYear();
-  return new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+  return new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
 }
 
 function recurringCardDateForMonth(item) {
-  const year = new Date().getFullYear();
-  return new Date(year, monthIndex(state.selectedMonth), Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
+  return new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
 }
 
 function statementRow(item) {
@@ -1873,7 +1915,7 @@ function renderAgenda() {
     return {
       type: "Fatura",
       title: card.name,
-      date: new Date(new Date().getFullYear(), monthIndex(state.selectedMonth), Math.min(Number(card.dueDay || 10), 28)),
+      date: new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(card.dueDay || 10), 28)),
       detail: `Vence dia ${card.dueDay || 10} · fecha dia ${card.closeDay || 20}`,
       value: totals.month,
       priority: totals.month > 0 ? "soon" : "normal"
@@ -1916,7 +1958,7 @@ function fixedBillCard(item) {
       <div>
         <span>${item.category}</span>
         <strong>${item.name}</strong>
-        <small>${info.dueText || `Vence dia ${item.dueDay}`} · ${item.person} · ${state.selectedMonth}</small>
+        <small>${info.dueText || `Vence dia ${item.dueDay}`} · ${item.person} · ${state.selectedMonth}/${state.selectedYear}</small>
       </div>
       <div class="wallet-account-money">
         <span>${paid ? "Pago no mês" : "Pendente no mês"}</span>
@@ -1942,7 +1984,7 @@ function addFixedBill(event) {
     category: data.category,
     person: data.person,
     status: data.status,
-    paidMonths: data.status === "Pago" ? [state.selectedMonth] : []
+    paidMonths: data.status === "Pago" ? [periodKey()] : []
   });
   notify("sync", `Conta fixa adicionada: ${data.name}`);
   commitState();
@@ -2001,7 +2043,7 @@ function renderCards() {
 }
 
 function cardRecurringRow(item) {
-  const paid = (item.paidMonths || []).includes(state.selectedMonth);
+  const paid = isPeriodPaid(item);
   return `
     <div class="list-item">
       <div><strong>${item.description}</strong><span>${item.card} · dia ${item.day} · ${item.category} · ${paid ? "Pago neste mês" : "Aberto neste mês"}</span></div>
@@ -2048,13 +2090,13 @@ function cardMonthItems(cardName) {
   const installments = state.installments
     .filter((item) => item.card === cardName)
     .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
-    .filter((part) => part.month === state.selectedMonth);
+    .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear));
   const recurring = state.cardRecurring
     .filter((item) => item.card === cardName && item.active !== false)
     .map((item) => ({
       month: state.selectedMonth,
       value: Number(item.value || 0),
-      paid: (item.paidMonths || []).includes(state.selectedMonth),
+      paid: isPeriodPaid(item),
       installmentId: item.id,
       description: item.description,
       category: item.category,
@@ -2097,8 +2139,12 @@ function addInstallment(event) {
   const data = Object.fromEntries(new FormData(event.target));
   if (!state.cards.length) return;
   const purchaseMonth = months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()];
+  const purchaseDate = new Date(`${data.date}T00:00:00Z`);
   const realInvoiceMonth = invoiceMonthForPurchase(data.date, data.card);
   const firstMonth = data.firstMonth === purchaseMonth ? realInvoiceMonth : data.firstMonth;
+  const firstMonthIndex = monthIndex(firstMonth);
+  const purchaseMonthIndex = Number.isNaN(purchaseDate.getTime()) ? firstMonthIndex : purchaseDate.getUTCMonth();
+  const firstYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear() + (firstMonthIndex < purchaseMonthIndex ? 1 : 0);
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
@@ -2108,6 +2154,7 @@ function addInstallment(event) {
     value: Number(data.value || 0),
     parts: Number(data.parts || 1),
     firstMonth,
+    firstYear,
     paidMonths: []
   });
   notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
@@ -2151,17 +2198,13 @@ function renderAccounts() {
       ${input("initial", "Saldo inicial", "number", "0", "0.01", "Quanto já tinha nessa conta antes de começar a usar o app.")}
       <button class="primary" type="submit">Salvar conta</button>
     </form>
-    <form class="entry-form guided-form" id="income-form">
-      <div class="span-3"><h2>Adicionar renda</h2></div>
-      ${select("category", "Tipo de renda", state.categoriesIncome, "", "Ex: salário, renda extra, pix recebido.")}
-      ${input("description", "Descrição", "text", "Salário", "", "Nome fácil para reconhecer essa renda.")}
-      ${input("value", "Valor", "number", "0", "0.01", "Valor que entra na conta.")}
-      ${select("person", "Quem recebe?", appPeople(), "", "Pessoa que recebeu essa renda.")}
-      ${select("account", "Conta que recebeu", accountOptions(), "", "Onde o dinheiro entrou.")}
-      ${input("day", "Dia do mês", "number", "5", "1", "Se for recorrente, esse é o dia em que costuma cair.")}
-      ${select("recurring", "Repetir todo mês?", ["Sim", "Não"], "Sim", "Use Sim para salário e rendas fixas.")}
-      <button class="primary" type="submit">Salvar renda</button>
-    </form>
+    <div class="panel salary-shortcut">
+      <div>
+        <h2>Salário automático</h2>
+        <p>O salário do casal agora fica em Cadastros, com valor e dia em que cai. A visão geral só mostra como disponível quando chega o dia certo.</p>
+      </div>
+      <button class="primary" type="button" data-view="settings">Configurar salários</button>
+    </div>
     </div>
     <div class="${walletTab === "cards" ? "" : "hidden"}">
     <form class="entry-form guided-form" id="new-card-form-main">
@@ -2188,7 +2231,6 @@ function renderAccounts() {
     </div>
   `;
   qs("#account-form").addEventListener("submit", addAccount);
-  qs("#income-form").addEventListener("submit", addIncome);
   qs("#new-card-form-main").addEventListener("submit", addCard);
   document.querySelectorAll("[data-wallet-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2282,7 +2324,7 @@ function addIncome(event) {
 
 function renderMethod() {
   const salaryTotal = salaryPlannedTotal();
-  const income = salaryTotal || Number(state.methodIncome || 0);
+  const income = salaryTotal;
   const rows = [
     ["50%", "Necessidades", income * .5, "#1677ff"],
     ["30%", "Guardar e investir", income * .3, "#00a86b"],
@@ -2291,12 +2333,9 @@ function renderMethod() {
   qs("#method").innerHTML = `
     <div class="panel helper-panel">
       <h2>Método 50/30/20</h2>
-      <p>${salaryTotal ? "Calculado automaticamente pelos salários cadastrados." : "Cadastre os salários em Cadastros ou informe uma renda manual abaixo."}</p>
+      <p>${salaryTotal ? "Calculado automaticamente pelos salários cadastrados." : "Cadastre pelo menos um salário em Cadastros para calcular o plano automaticamente."}</p>
     </div>
-    <form class="entry-form" id="method-form">
-      ${input("methodIncome", "Renda manual", "number", state.methodIncome, "0.01", "Usada somente se os salários do casal estiverem zerados.")}
-      <button class="primary" type="submit">Salvar renda manual</button>
-    </form>
+    ${salaryTotal ? "" : `<div class="panel salary-shortcut"><div><h2>Comece pela renda do casal</h2><p>Informe o salário e o dia em que cai para o app calcular o mês sozinho.</p></div><button class="primary" type="button" data-view="settings">Configurar salários</button></div>`}
     <div class="panel method-box">
       ${rows.map(([percent, label, value, color]) => `
         <div class="method-row">
@@ -2307,12 +2346,6 @@ function renderMethod() {
       `).join("")}
     </div>
   `;
-  qs("#method-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.methodIncome = Number(new FormData(event.target).get("methodIncome") || 0);
-    notify("sync", "Método 50/30/20 atualizado");
-    commitState();
-  });
 }
 
 function renderGoals() {
@@ -2775,9 +2808,15 @@ document.addEventListener("click", (event) => {
     state.fixedBills = (state.fixedBills || []).map((item) => {
       if (item.id !== event.target.dataset.toggleFixed) return item;
       const paidMonths = new Set(item.paidMonths || []);
-      if (paidMonths.has(state.selectedMonth)) paidMonths.delete(state.selectedMonth);
-      else paidMonths.add(state.selectedMonth);
-      return { ...item, paidMonths: [...paidMonths], status: paidMonths.has(state.selectedMonth) ? "Pago" : "Pendente" };
+      const key = periodKey();
+      if (paidMonths.has(key) || paidMonths.has(state.selectedMonth)) {
+        paidMonths.delete(key);
+        paidMonths.delete(state.selectedMonth);
+      } else {
+        paidMonths.add(key);
+      }
+      const updated = { ...item, paidMonths: [...paidMonths] };
+      return { ...updated, status: isFixedPaid(updated) ? "Pago" : "Pendente" };
     });
     notify("sync", "Status da conta fixa atualizado");
     commitState();
@@ -2850,10 +2889,10 @@ document.addEventListener("click", (event) => {
     state.installments = state.installments.map((item) => {
       if (item.card !== cardName) return item;
       const schedule = getInstallmentSchedule(item);
-      if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
-      return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] };
+      if (!schedule.some((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))) return item;
+      return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] };
     });
-    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), state.selectedMonth])] } : item);
+    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] } : item);
     notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
@@ -2863,21 +2902,26 @@ document.addEventListener("click", (event) => {
     state.installments = state.installments.map((item) => {
       if (item.card !== cardName) return item;
       const schedule = getInstallmentSchedule(item);
-      if (!schedule.some((part) => part.month === state.selectedMonth)) return item;
-      return { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth) };
+      if (!schedule.some((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))) return item;
+      return { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth && month !== periodKey()) };
     });
-    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth) } : item);
+    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth && month !== periodKey()) } : item);
     notify("card", `Fatura reaberta: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
 
   if (event.target.dataset.toggleCardPart) {
-    const [id, month] = event.target.dataset.toggleCardPart.split("|");
+    const [id, month, year] = event.target.dataset.toggleCardPart.split("|");
     state.installments = state.installments.map((item) => {
       if (item.id !== id) return item;
       const paidMonths = new Set(item.paidMonths || []);
-      if (paidMonths.has(month)) paidMonths.delete(month);
-      else paidMonths.add(month);
+      const key = periodKey(month, year || state.selectedYear);
+      if (paidMonths.has(key) || paidMonths.has(month)) {
+        paidMonths.delete(key);
+        paidMonths.delete(month);
+      } else {
+        paidMonths.add(key);
+      }
       return { ...item, paidMonths: [...paidMonths] };
     });
     notify("card", "Status da parcela atualizado");
@@ -2888,8 +2932,13 @@ document.addEventListener("click", (event) => {
     state.cardRecurring = state.cardRecurring.map((item) => {
       if (item.id !== event.target.dataset.toggleCardRecurring) return item;
       const paidMonths = new Set(item.paidMonths || []);
-      if (paidMonths.has(state.selectedMonth)) paidMonths.delete(state.selectedMonth);
-      else paidMonths.add(state.selectedMonth);
+      const key = periodKey();
+      if (paidMonths.has(key) || paidMonths.has(state.selectedMonth)) {
+        paidMonths.delete(key);
+        paidMonths.delete(state.selectedMonth);
+      } else {
+        paidMonths.add(key);
+      }
       return { ...item, paidMonths: [...paidMonths] };
     });
     notify("card", "Status do fixo no cartão atualizado");
@@ -2900,6 +2949,13 @@ document.addEventListener("click", (event) => {
 qs("#month-filter").addEventListener("change", (event) => {
   state.selectedMonth = event.target.value;
   render();
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target?.id === "year-filter") {
+    state.selectedYear = Number(event.target.value);
+    render();
+  }
 });
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {

@@ -1,18 +1,18 @@
 :root {
-  --bg: #eff8fb;
+  --bg: #eefcff;
   --panel: #ffffff;
-  --ink: #10202c;
-  --muted: #5f7080;
-  --line: #d5e8ec;
-  --green: #00bf7a;
-  --green-dark: #00845d;
-  --red: #f04438;
-  --blue: #147dff;
-  --gold: #ffb020;
-  --teal: #00c2c7;
-  --violet: #7c4dff;
-  --pink: #ff4f8b;
-  --shadow: 0 18px 40px rgba(16, 69, 92, .13);
+  --ink: #101f2a;
+  --muted: #627281;
+  --line: #cfe8ee;
+  --green: #00d084;
+  --green-dark: #007f61;
+  --red: #ff4d3d;
+  --blue: #0d8cff;
+  --gold: #ffbd2f;
+  --teal: #00d6d6;
+  --violet: #7157ff;
+  --pink: #ff4fa3;
+  --shadow: 0 20px 44px rgba(7, 74, 95, .14);
 }
 
 * { box-sizing: border-box; }
@@ -22,9 +22,10 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at 18% 0%, rgba(0, 194, 199, .18), transparent 30%),
-    radial-gradient(circle at 86% 8%, rgba(255, 176, 32, .16), transparent 28%),
-    linear-gradient(180deg, #e8fbff 0, var(--bg) 300px),
+    radial-gradient(circle at 18% 0%, rgba(0, 214, 214, .22), transparent 30%),
+    radial-gradient(circle at 86% 8%, rgba(255, 189, 47, .18), transparent 28%),
+    radial-gradient(circle at 48% 0%, rgba(255, 79, 163, .12), transparent 26%),
+    linear-gradient(180deg, #e7fcff 0, var(--bg) 300px),
     var(--bg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   display: grid;
@@ -223,8 +224,9 @@ button {
 
 .sidebar {
   background:
-    radial-gradient(circle at 20% 12%, rgba(0, 194, 199, .22), transparent 28%),
-    linear-gradient(180deg, #062a3c 0%, #07483f 48%, #081f3c 100%);
+    radial-gradient(circle at 20% 12%, rgba(0, 214, 214, .24), transparent 28%),
+    radial-gradient(circle at 84% 40%, rgba(255, 189, 47, .12), transparent 24%),
+    linear-gradient(180deg, #051c30 0%, #063d36 48%, #071f3c 100%);
   color: white;
   min-height: 100vh;
   padding: 22px 14px;
@@ -398,6 +400,10 @@ h2 {
   font-weight: 900;
 }
 
+.year-compact select {
+  min-width: 72px;
+}
+
 .invite-link {
   max-width: 360px;
   overflow: hidden;
@@ -542,7 +548,7 @@ h2 {
 }
 
 .balance-card {
-  min-height: 230px;
+  min-height: 205px;
   display: flex;
   justify-content: space-between;
   align-items: end;
@@ -551,10 +557,10 @@ h2 {
   color: white;
   border-radius: 18px;
   background:
-    radial-gradient(circle at 88% 16%, rgba(255, 224, 113, .42), transparent 24%),
-    radial-gradient(circle at 18% 80%, rgba(255, 79, 139, .22), transparent 27%),
-    linear-gradient(135deg, #07304a 0%, #00bf7a 52%, #147dff 112%);
-  box-shadow: 0 24px 52px rgba(20, 125, 255, .20);
+    radial-gradient(circle at 88% 16%, rgba(255, 224, 113, .46), transparent 24%),
+    radial-gradient(circle at 18% 80%, rgba(255, 79, 163, .28), transparent 27%),
+    linear-gradient(135deg, #071f3d 0%, #00d084 48%, #0d8cff 112%);
+  box-shadow: 0 24px 52px rgba(13, 140, 255, .22);
   overflow: hidden;
   position: relative;
 }
@@ -580,7 +586,7 @@ h2 {
 .balance-card strong {
   display: block;
   margin: 10px 0 8px;
-  font-size: clamp(34px, 6vw, 58px);
+  font-size: clamp(32px, 5.2vw, 54px);
   line-height: 1;
   position: relative;
   z-index: 1;
@@ -600,8 +606,8 @@ h2 {
 }
 
 .couple-widget {
-  width: min(190px, 28vw);
-  min-width: 132px;
+  width: min(138px, 22vw);
+  min-width: 96px;
   align-self: center;
   position: relative;
   z-index: 1;
@@ -708,7 +714,7 @@ h2 {
 }
 
 .mood-message {
-  max-width: 310px;
+  max-width: 360px;
   margin: 14px 0 0;
   color: rgba(255, 255, 255, .84);
   font-weight: 700;
@@ -722,13 +728,13 @@ h2 {
 }
 
 .action-chip {
-  min-height: 108px;
+  min-height: 96px;
   display: grid;
   place-items: center;
   gap: 8px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--panel);
   color: var(--ink);
   box-shadow: var(--shadow);
@@ -746,10 +752,10 @@ h2 {
   font-size: 21px;
 }
 
-.action-chip:nth-child(1) b { background: linear-gradient(135deg, #00bf7a, #00e09a); }
-.action-chip:nth-child(2) b { background: linear-gradient(135deg, #147dff, #7c4dff); }
-.action-chip:nth-child(3) b { background: linear-gradient(135deg, #ffb020, #ff4f8b); }
-.action-chip:nth-child(4) b { background: linear-gradient(135deg, #00c2c7, #147dff); }
+.action-chip:nth-child(1) b { background: linear-gradient(135deg, #00d084, #00d6d6); }
+.action-chip:nth-child(2) b { background: linear-gradient(135deg, #0d8cff, #7157ff); }
+.action-chip:nth-child(3) b { background: linear-gradient(135deg, #ffbd2f, #ff4fa3); }
+.action-chip:nth-child(4) b { background: linear-gradient(135deg, #00d6d6, #0d8cff); }
 
 .action-chip span {
   font-weight: 800;
@@ -839,6 +845,22 @@ h2 {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+}
+
+.salary-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(0, 208, 132, .13), transparent 34%),
+    linear-gradient(135deg, #ffffff, #f0fcff);
+}
+
+.salary-shortcut p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .entry-form h2 {
@@ -2206,9 +2228,9 @@ button.list-item {
   }
 
   h1 {
-    font-size: 52px;
+    font-size: 42px;
     color: #f2fff9;
-    line-height: .95;
+    line-height: 1;
     letter-spacing: 0;
   }
 
@@ -2219,7 +2241,7 @@ button.list-item {
   .top-actions {
     align-items: stretch;
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 18px;
     gap: 10px;
   }
@@ -2470,20 +2492,20 @@ button.list-item {
 
   .balance-card {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     min-height: 0;
-    padding: 24px;
-    border-radius: 30px;
+    padding: 22px;
+    border-radius: 26px;
     overflow: hidden;
     border: 1px solid rgba(183, 255, 238, .16);
     background:
       radial-gradient(circle at 78% 14%, rgba(21, 225, 174, .35), transparent 30%),
       radial-gradient(circle at 22% 90%, rgba(23, 168, 255, .22), transparent 32%),
-      linear-gradient(145deg, #0d3a36 0%, #0a6151 48%, #079f86 100%);
+      linear-gradient(145deg, #08243f 0%, #087866 48%, #06b49a 100%);
   }
 
   .balance-card strong {
-    font-size: 38px;
+    font-size: 34px;
   }
 
   .quick-actions {
@@ -2494,9 +2516,9 @@ button.list-item {
   }
 
   .action-chip {
-    min-height: 76px;
+    min-height: 66px;
     padding: 12px 10px;
-    border-radius: 20px;
+    border-radius: 18px;
     color: #f2fff9;
     background: rgba(255, 255, 255, .07);
     border-color: rgba(183, 255, 238, .13);
@@ -2508,26 +2530,32 @@ button.list-item {
 
   .couple-widget {
     order: 0;
-    width: min(190px, 62vw);
-    justify-self: center;
+    width: min(118px, 30vw);
+    min-width: 86px;
+    justify-self: end;
   }
 
   .balance-ring {
     right: 18px;
-    top: 92px;
-    width: 76px;
-    height: 76px;
+    top: auto;
+    bottom: 18px;
+    width: 62px;
+    height: 62px;
   }
 
   .action-chip b {
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
-    font-size: 19px;
+    width: 30px;
+    height: 30px;
+    border-radius: 11px;
+    font-size: 17px;
   }
 
   .action-chip span {
-    font-size: 14px;
+    font-size: 13px;
+  }
+
+  .salary-shortcut {
+    display: grid;
   }
 
   .statement-item {
