@@ -742,7 +742,7 @@ function renderModal() {
       </div>
       <div class="quick-shortcuts">
         <button class="quick-shortcut" type="button" data-view="entries"><b>＋</b><span>Lançar entrada/saída</span></button>
-        <button class="quick-shortcut" type="button" data-view="cards"><b>▣</b><span>Compra no cartão</span></button>
+        <button class="quick-shortcut" type="button" data-view="entries"><b>▣</b><span>Compra no cartão</span></button>
         <button class="quick-shortcut" type="button" data-view="fixed"><b>◷</b><span>Despesa fixa</span></button>
         <button class="quick-shortcut" type="button" data-view="accounts"><b>≋</b><span>Carteira</span></button>
         <button class="quick-shortcut danger-soft" type="button" id="quick-logout"><b>↩</b><span>Sair da conta</span></button>
@@ -1394,8 +1394,7 @@ function initialSetupPanel() {
       icon: "▣",
       title: "Adicionar cartão",
       note: "Cadastre limite e cartão para fatura e compras parceladas.",
-      view: "accounts",
-      wallet: "cards"
+      view: "cards"
     },
     {
       done: state.fixedBills.length > 0 || state.cardRecurring.length > 0,
@@ -1754,12 +1753,13 @@ function renderEntries() {
   const entryIncome = total(monthEntries.filter((item) => item.type === "Receita"));
   const entryExpense = total(monthEntries.filter((item) => item.type === "Despesa"));
   const pendingExpense = total(monthEntries.filter((item) => item.type === "Despesa" && item.status === "Pendente"));
+  const recentCardRows = state.installments.slice(0, 5);
   qs("#entries").innerHTML = `
     <section class="feature-hero entries-hero">
       <div>
         <span>Movimento do mês</span>
         <h2>Lançamentos simples</h2>
-        <p>Entradas e saídas feitas na hora. Cartão e contas fixas ficam separados para não misturar.</p>
+        <p>Registre entradas, saídas e compras no cartão. As contas fixas ficam em uma aba própria.</p>
       </div>
       <div class="feature-stats">
         <div><span>Entradas</span><strong>${formatMoney(entryIncome)}</strong></div>
@@ -1785,6 +1785,17 @@ function renderEntries() {
       <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
       ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
     </form>
+    <form class="entry-form guided-form" id="card-form">
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Compra no cartão</h2><small>Lance a compra aqui. O app divide parcelas e joga na fatura do cartão.</small></div></div>
+      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada. Cadastre cartões na aba Cartões.")} 
+      ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
+      ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
+      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria da compra para relatórios.")}
+      ${input("value", "Valor da compra", "number", "", "0.01", "Valor total, antes de dividir em parcelas.")}
+      ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
+      ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
+      <button class="primary" type="submit">Salvar compra no cartão</button>
+    </form>
     <div class="panel soft-panel">
       <div class="section-title"><span>↻</span><div><h2>Fixos configurados</h2><small>Use isto apenas para gerar receitas/despesas recorrentes antigas.</small></div></div>
       <div class="list">
@@ -1808,8 +1819,19 @@ function renderEntries() {
       `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
       ]))}
     </div>
+    <div class="panel soft-panel">
+      <div class="section-title"><span>▣</span><div><h2>Compras recentes no cartão</h2><small>As compras do crédito também aparecem no Extrato e nas faturas.</small></div></div>
+      ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], recentCardRows.map((item) => [
+        item.description,
+        item.card,
+        `<td class="amount">${formatMoney(item.value)}</td>`,
+        item.parts,
+        `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
+      ]))}
+    </div>
   `;
   qs("#entry-form").addEventListener("submit", addEntry);
+  qs("#card-form").addEventListener("submit", addInstallment);
   qs("#generate-recurring").addEventListener("click", generateRecurring);
   const cancel = qs("#cancel-edit");
   if (cancel) cancel.addEventListener("click", () => {
@@ -2267,7 +2289,6 @@ function editFixedBill(id) {
 }
 
 function renderCards() {
-  const cardTableRows = state.installments.slice(0, 8);
   const summary = currentSummary();
   const cardLimit = total(state.cards.map((card) => ({ value: card.limit })));
   const cardUsed = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
@@ -2277,7 +2298,7 @@ function renderCards() {
       <div>
         <span>Crédito organizado</span>
         <h2>Cartões e faturas</h2>
-        <p>Compras parceladas, limite disponível, fatura do mês e fixos do cartão em um lugar só.</p>
+        <p>Cadastre cartões, acompanhe limite, fechamento, vencimento e faturas. Compras no cartão ficam em Lançamentos.</p>
       </div>
       <div class="feature-stats">
         <div><span>Fatura mês</span><strong>${formatMoney(summary.cardMonth)}</strong></div>
@@ -2285,16 +2306,15 @@ function renderCards() {
         <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
       </div>
     </section>
-    <form class="entry-form" id="card-form">
-      <div class="span-3 form-heading"><span>+</span><div><h2>Compra no crédito</h2><small>Informe o valor total e o app divide as parcelas na fatura.</small></div></div>
-      ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada.")}
-      ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
-      ${input("description", "Descrição", "text", "", "", "Ex: mercado, farmácia, presente.")}
-      ${select("category", "Categoria", state.categoriesExpense, "", "Categoria da compra para relatórios.")}
-      ${input("value", "Valor da compra", "number", "", "0.01", "Valor total, antes de dividir em parcelas.")}
-      ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
-      ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
-      <button class="primary" type="submit">Adicionar</button>
+    <form class="entry-form guided-form" id="card-settings-form">
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Configure limite, fechamento e vencimento para calcular faturas.</small></div></div>
+      ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
+      ${select("owner", "Titular", appPeople(), "", "Pessoa responsável pelo cartão.")}
+      ${input("limit", "Limite", "number", "0", "0.01", "Limite total disponível no cartão.")}
+      ${input("closeDay", "Dia que fecha", "number", "20", "1", "Compras depois desse dia entram na próxima fatura.")}
+      ${input("dueDay", "Dia de vencimento", "number", "10", "1", "Dia em que a fatura vence.")}
+      ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda o visual do cartão.")}
+      <button class="primary" type="submit">Salvar cartão</button>
     </form>
     <div class="panel soft-panel">
       <div class="section-title"><span>▣</span><div><h2>Meus cartões</h2><small>Limite, vencimento, fechamento e fatura atual.</small></div></div>
@@ -2308,18 +2328,8 @@ function renderCards() {
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
-    <div class="panel soft-panel">
-      <div class="section-title"><span>☷</span><div><h2>Compras recentes</h2></div></div>
-      ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], cardTableRows.map((item) => [
-        item.description,
-        item.card,
-        `<td class="amount">${formatMoney(item.value)}</td>`,
-        item.parts,
-        `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
-      ]))}
-    </div>
   `;
-  qs("#card-form").addEventListener("submit", addInstallment);
+  qs("#card-settings-form").addEventListener("submit", addCard);
 }
 
 function cardRecurringRow(item) {
@@ -2421,7 +2431,11 @@ function cardOptions() {
 function addInstallment(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  if (!state.cards.length) return;
+  if (!state.cards.length) {
+    showToast("Cadastre um cartão antes de lançar compra no crédito", "error");
+    setActiveView("cards");
+    return;
+  }
   const purchaseMonth = months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()];
   const purchaseDate = new Date(`${data.date}T00:00:00Z`);
   const realInvoiceMonth = invoiceMonthForPurchase(data.date, data.card);
@@ -2477,16 +2491,12 @@ function addCardPayment(cardName, value, description = "Pagamento da fatura") {
 }
 
 function renderAccounts() {
+  walletTab = "money";
   qs("#accounts").innerHTML = `
     <div class="panel helper-panel">
       <h2>Nossa Carteira</h2>
-      <p>Cadastre as contas onde o dinheiro fica e os cartões usados nas compras do casal.</p>
+      <p>Cadastre as contas onde o dinheiro fica: banco, dinheiro em casa, conta digital ou investimento.</p>
     </div>
-    <div class="mode-picker wallet-tabs" role="tablist" aria-label="Carteira">
-      <button class="${walletTab === "money" ? "active" : ""}" type="button" data-wallet-tab="money">Dinheiro</button>
-      <button class="${walletTab === "cards" ? "active" : ""}" type="button" data-wallet-tab="cards">Cartões</button>
-    </div>
-    <div class="${walletTab === "money" ? "" : "hidden"}">
     <form class="entry-form guided-form" id="account-form">
       <div class="span-3"><h2>Adicionar conta</h2></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: Nubank, Itaú, Caixa, Dinheiro em casa.")}
@@ -2502,39 +2512,14 @@ function renderAccounts() {
       </div>
       <button class="primary" type="button" data-view="settings">Configurar salários</button>
     </div>
-    </div>
-    <div class="${walletTab === "cards" ? "" : "hidden"}">
-    <form class="entry-form guided-form" id="new-card-form-main">
-      <div class="span-3"><h2>Adicionar cartão de crédito</h2></div>
-      ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Neon, Inter, cartão do mercado.")}
-      ${input("limit", "Limite total", "number", "0", "0.01", "Limite aprovado no cartão de crédito.")}
-      ${input("closeDay", "Fecha dia", "number", "20", "1", "Dia em que a fatura fecha.")}
-      ${input("dueDay", "Vence dia", "number", "10", "1", "Dia em que a fatura vence.")}
-      ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda a aparência do cartão no app.")}
-      <button class="primary" type="submit">Adicionar cartão</button>
-    </form>
-    </div>
-    <div>
-      <div class="panel ${walletTab === "money" ? "" : "hidden"}">
-        <h2>Contas cadastradas</h2>
-        <div class="wallet-list">
-          ${state.accounts.length ? state.accounts.map(accountCard).join("") : emptyHtml()}
-        </div>
-      </div>
-      <div class="panel ${walletTab === "cards" ? "" : "hidden"}">
-        <h2>Cartões de crédito</h2>
-        <div class="wallet-cards">${state.cards.map(cardSummary).join("") || emptyHtml()}</div>
+    <div class="panel">
+      <h2>Contas cadastradas</h2>
+      <div class="wallet-list">
+        ${state.accounts.length ? state.accounts.map(accountCard).join("") : emptyHtml()}
       </div>
     </div>
   `;
   qs("#account-form").addEventListener("submit", addAccount);
-  qs("#new-card-form-main").addEventListener("submit", addCard);
-  document.querySelectorAll("[data-wallet-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      walletTab = button.dataset.walletTab;
-      renderAccounts();
-    });
-  });
 }
 
 function accountCard(account) {
