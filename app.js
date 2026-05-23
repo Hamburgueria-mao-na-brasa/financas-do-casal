@@ -779,7 +779,7 @@ function renderModal() {
 
 function editModalHtml(config) {
   const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", cardRecurring: "Editar fixo no cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
-  const fields = config.fields.map((field) => input(field.name, field.label, field.type || "text", field.value ?? "", field.step || "")).join("");
+  const fields = config.fields.map(editFieldHtml).join("");
   return `
     <div class="modal-card">
       <div class="modal-head">
@@ -795,6 +795,16 @@ function editModalHtml(config) {
       </form>
     </div>
   `;
+}
+
+function editFieldHtml(field) {
+  if (field.type === "select") {
+    return `<label class="field"><span>${labelWithHelp(field.label, field.help || "")}</span><select name="${field.name}">${field.options.map((option) => {
+      const selected = field.match === "card" ? sameCard(option, field.value) : option === field.value;
+      return `<option ${selected ? "selected" : ""}>${option}</option>`;
+    }).join("")}</select></label>`;
+  }
+  return input(field.name, field.label, field.type || "text", field.value ?? "", field.step || "", field.help || "");
 }
 
 function saveEditModal(event) {
@@ -2988,12 +2998,12 @@ function editInstallment(id) {
   if (!item) return;
   modalMode = { kind: "installment", id, fields: [
     { name: "date", label: "Data da compra", type: "date", value: item.date },
-    { name: "card", label: "Cartão", value: item.card },
+    { name: "card", label: "Cartão", type: "select", options: cardOptions(), value: item.card, match: "card" },
     { name: "description", label: "Descrição", value: item.description },
-    { name: "category", label: "Categoria", value: item.category },
+    { name: "category", label: "Categoria", type: "select", options: state.categoriesExpense, value: item.category },
     { name: "value", label: "Valor total", type: "number", step: "0.01", value: item.value },
     { name: "parts", label: "Parcelas", type: "number", step: "1", value: item.parts },
-    { name: "firstMonth", label: "Primeiro mês", value: item.firstMonth }
+    { name: "firstMonth", label: "Primeiro mês", type: "select", options: months, value: item.firstMonth }
   ] };
   renderModal();
 }
@@ -3002,9 +3012,9 @@ function editCardRecurring(id) {
   const item = state.cardRecurring.find((fixed) => fixed.id === id);
   if (!item) return;
   modalMode = { kind: "cardRecurring", id, fields: [
-    { name: "card", label: "Cartão", value: item.card },
+    { name: "card", label: "Cartão", type: "select", options: cardOptions(), value: item.card, match: "card" },
     { name: "description", label: "Nome", value: item.description },
-    { name: "category", label: "Categoria", value: item.category },
+    { name: "category", label: "Categoria", type: "select", options: state.categoriesExpense, value: item.category },
     { name: "value", label: "Valor mensal", type: "number", step: "0.01", value: item.value },
     { name: "day", label: "Dia da cobrança", type: "number", step: "1", value: item.day }
   ] };
