@@ -1470,6 +1470,58 @@ h2 {
   align-items: end;
 }
 
+.card-statement-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.statement-card-select {
+  max-width: 360px;
+}
+
+.card-invoice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.card-statement-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(19, 216, 255, .16), transparent 30%),
+    rgba(255, 255, 255, .06);
+}
+
+.card-statement-card span,
+.card-statement-card small {
+  color: var(--muted);
+}
+
+.card-statement-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.card-statement-values {
+  display: grid;
+  gap: 6px;
+}
+
+.card-statement-values span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statement-item.card-payment .statement-icon {
+  background: linear-gradient(135deg, var(--gold), var(--teal));
+}
+
 .today-panel {
   border-color: rgba(0, 191, 122, .22);
   background: linear-gradient(135deg, #ffffff, #ecfff8);

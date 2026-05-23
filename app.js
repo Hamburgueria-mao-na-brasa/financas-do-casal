@@ -2200,16 +2200,20 @@ function cardInvoiceRow(card) {
   const paidItems = monthItems.filter((item) => item.paid);
   const openItems = monthItems.filter((item) => !item.paid);
   const paidTotal = total(paidItems);
+  const invoicePayments = cardPaymentTotal(card.name);
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   const totalMonth = totals.month + paidTotal;
+  const openAfterPayments = Math.max(0, totals.month - invoicePayments);
   return `
     <div class="invoice-card">
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Fecha dia ${card.closeDay || 20} · vence dia ${card.dueDay || 10} · Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(totals.month)} · Paga ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+          <span>Fecha dia ${card.closeDay || 20} · vence dia ${card.dueDay || 10} · Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(openAfterPayments)} · Pago parcial ${formatMoney(invoicePayments)} · Itens pagos ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
         </div>
-        ${openItems.length ? `<button class="tiny ghost" data-pay-card-month="${card.name}">Marcar fatura paga</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
+        <span class="card-actions">
+          ${openItems.length ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar parcial</button> <button class="tiny ghost" data-pay-card-month="${card.name}">Quitar fatura</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
+        </span>
       </div>
       <div class="invoice-items">
         ${monthItems.length ? monthItems.map((item) => `
@@ -2314,6 +2318,19 @@ function addCardRecurring(event) {
   });
   notify("card", `Fixo no cartão: ${data.description} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
+}
+
+function addCardPayment(cardName, value, description = "Pagamento da fatura") {
+  state.cardPayments ||= [];
+  state.cardPayments.unshift({
+    id: crypto.randomUUID(),
+    card: cardName,
+    value: Number(value || 0),
+    description,
+    month: state.selectedMonth,
+    year: Number(state.selectedYear || new Date().getFullYear()),
+    date: new Date().toISOString().slice(0, 10)
+  });
 }
 
 function renderAccounts() {
@@ -2919,6 +2936,7 @@ document.addEventListener("click", (event) => {
     ["deleteEntry", "entries", "entry"],
     ["deleteInstallment", "installments", "installment"],
     ["deleteCardRecurring", "cardRecurring", "cardRecurring"],
+    ["deleteCardPayment", "cardPayments", "cardPayment"],
     ["deleteAccount", "accounts", "account"],
     ["deleteCard", "cards", "card"],
     ["deleteFixed", "fixedBills", "fixed"],
@@ -3036,6 +3054,8 @@ document.addEventListener("click", (event) => {
 
   if (event.target.dataset.payCardMonth) {
     const cardName = event.target.dataset.payCardMonth;
+    const openValue = Math.max(0, cardTotals(cardName).month - cardPaymentTotal(cardName));
+    if (openValue > 0) addCardPayment(cardName, openValue, "Quitação da fatura");
     state.installments = state.installments.map((item) => {
       if (item.card !== cardName) return item;
       const schedule = getInstallmentSchedule(item);
@@ -3044,6 +3064,21 @@ document.addEventListener("click", (event) => {
     });
     state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] } : item);
     notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
+    commitState();
+  }
+
+  if (event.target.dataset.partialCardPayment) {
+    const cardName = event.target.dataset.partialCardPayment;
+    const openValue = Math.max(0, cardTotals(cardName).month - cardPaymentTotal(cardName));
+    const typed = prompt(`Quanto foi pago da fatura ${cardName}? Valor aberto: ${formatMoney(openValue)}`, openValue ? String(openValue.toFixed(2)) : "");
+    if (typed === null) return;
+    const value = Number(String(typed).replace(",", "."));
+    if (!Number.isFinite(value) || value <= 0) {
+      showToast("Informe um valor válido para o pagamento", "error");
+      return;
+    }
+    addCardPayment(cardName, value, "Pagamento parcial da fatura");
+    notify("card", `Pagamento parcial: ${cardName} · ${formatMoney(value)}`);
     commitState();
   }
 
