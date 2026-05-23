@@ -159,7 +159,7 @@ function getInstallmentSchedule(item) {
 }
 
 function invoiceMonthForPurchase(dateValue, cardName) {
-  const card = state.cards.find((item) => item.name === cardName);
+  const card = state.cards.find((item) => sameCard(item.name, cardName));
   const date = new Date(`${dateValue}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return state.selectedMonth;
   const purchaseMonth = months[date.getUTCMonth()];
@@ -167,18 +167,26 @@ function invoiceMonthForPurchase(dateValue, cardName) {
   return date.getUTCDate() > closeDay ? months[(date.getUTCMonth() + 1) % 12] : purchaseMonth;
 }
 
+function cardKey(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function sameCard(left, right) {
+  return cardKey(left) === cardKey(right);
+}
+
 function cardTotals(cardName) {
   const selectedIndex = monthIndex(state.selectedMonth);
   const nextMonth = months[(selectedIndex + 1) % 12];
   const nextYear = Number(state.selectedYear || new Date().getFullYear()) + (selectedIndex === 11 ? 1 : 0);
   const scheduled = state.installments
-    .filter((item) => item.card === cardName)
+    .filter((item) => sameCard(item.card, cardName))
     .flatMap(getInstallmentSchedule);
   const recurring = state.cardRecurring
-    .filter((item) => item.card === cardName && item.active !== false)
+    .filter((item) => sameCard(item.card, cardName) && item.active !== false)
     .map((item) => ({ month: state.selectedMonth, value: Number(item.value || 0), paid: isPeriodPaid(item) }));
   const recurringNext = state.cardRecurring
-    .filter((item) => item.card === cardName && item.active !== false && !isPeriodPaid(item, nextMonth, nextYear))
+    .filter((item) => sameCard(item.card, cardName) && item.active !== false && !isPeriodPaid(item, nextMonth, nextYear))
     .map((item) => ({ value: Number(item.value || 0) }));
   const open = scheduled.filter((part) => !part.paid);
   const recurringOpen = recurring.filter((part) => !part.paid);
@@ -813,8 +821,8 @@ function saveEditModal(event) {
       item.limit = Number(data.limit || 0);
       item.closeDay = Number(data.closeDay || 20);
       item.dueDay = Number(data.dueDay || 10);
-      state.installments = state.installments.map((installment) => installment.card === oldName ? { ...installment, card: item.name } : installment);
-      state.cardRecurring = state.cardRecurring.map((fixed) => fixed.card === oldName ? { ...fixed, card: item.name } : fixed);
+      state.installments = state.installments.map((installment) => sameCard(installment.card, oldName) ? { ...installment, card: item.name } : installment);
+      state.cardRecurring = state.cardRecurring.map((fixed) => sameCard(fixed.card, oldName) ? { ...fixed, card: item.name } : fixed);
     }
   }
   if (data.kind === "installment") {
@@ -2017,7 +2025,7 @@ function renderStatement() {
           </select>
         </label>
         <div class="card-invoice-grid">
-          ${cardInvoices.filter((item) => statementCardFilter === "Todos" || item.card === statementCardFilter).map(cardStatementCard).join("") || emptyHtml()}
+          ${cardInvoices.filter((item) => statementCardFilter === "Todos" || sameCard(item.card, statementCardFilter)).map(cardStatementCard).join("") || emptyHtml()}
         </div>
       </div>
     ` : ""}
@@ -2077,7 +2085,7 @@ function cardPaymentRows(cardName = "") {
   return (state.cardPayments || []).filter((item) =>
     item.month === state.selectedMonth &&
     Number(item.year) === Number(state.selectedYear) &&
-    (!cardName || item.card === cardName)
+    (!cardName || sameCard(item.card, cardName))
   );
 }
 
@@ -2382,11 +2390,11 @@ function cardInvoiceRow(card) {
 
 function cardMonthItems(cardName) {
   const installments = state.installments
-    .filter((item) => item.card === cardName)
+    .filter((item) => sameCard(item.card, cardName))
     .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
     .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear));
   const recurring = state.cardRecurring
-    .filter((item) => item.card === cardName && item.active !== false)
+    .filter((item) => sameCard(item.card, cardName) && item.active !== false)
     .map((item) => ({
       month: state.selectedMonth,
       value: Number(item.value || 0),
@@ -3210,12 +3218,12 @@ document.addEventListener("click", (event) => {
     const openValue = Math.max(0, cardTotals(cardName).month - cardPaymentTotal(cardName));
     if (openValue > 0) addCardPayment(cardName, openValue, "Quitação da fatura");
     state.installments = state.installments.map((item) => {
-      if (item.card !== cardName) return item;
+      if (!sameCard(item.card, cardName)) return item;
       const schedule = getInstallmentSchedule(item);
       if (!schedule.some((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))) return item;
       return { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] };
     });
-    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] } : item);
+    state.cardRecurring = state.cardRecurring.map((item) => sameCard(item.card, cardName) ? { ...item, paidMonths: [...new Set([...(item.paidMonths || []), periodKey()])] } : item);
     notify("card", `Fatura marcada como paga: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
@@ -3238,12 +3246,12 @@ document.addEventListener("click", (event) => {
   if (event.target.dataset.reopenCardMonth) {
     const cardName = event.target.dataset.reopenCardMonth;
     state.installments = state.installments.map((item) => {
-      if (item.card !== cardName) return item;
+      if (!sameCard(item.card, cardName)) return item;
       const schedule = getInstallmentSchedule(item);
       if (!schedule.some((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))) return item;
       return { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth && month !== periodKey()) };
     });
-    state.cardRecurring = state.cardRecurring.map((item) => item.card === cardName ? { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth && month !== periodKey()) } : item);
+    state.cardRecurring = state.cardRecurring.map((item) => sameCard(item.card, cardName) ? { ...item, paidMonths: (item.paidMonths || []).filter((month) => month !== state.selectedMonth && month !== periodKey()) } : item);
     notify("card", `Fatura reaberta: ${cardName} · ${state.selectedMonth}`);
     commitState();
   }
