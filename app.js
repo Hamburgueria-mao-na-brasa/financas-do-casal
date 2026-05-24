@@ -3914,6 +3914,16 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("submit", (event) => {
+  if (event.defaultPrevented) return;
+  if (event.target?.id === "entry-form") {
+    addEntry(event);
+  }
+  if (event.target?.id === "card-form") {
+    addInstallment(event);
+  }
+});
+
 document.addEventListener("change", (event) => {
   if (event.target?.id === "month-filter" || event.target?.matches("[data-period-month]")) {
     state.selectedMonth = event.target.value;

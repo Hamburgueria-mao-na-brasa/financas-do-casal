@@ -94,6 +94,30 @@ body.app-ready .period-switcher {
   display: none !important;
 }
 
+.entries-split,
+.entry-form,
+.guided-form,
+.field,
+.field input,
+.field select,
+.field textarea {
+  position: relative;
+}
+
+.entries-split,
+.entry-form,
+.guided-form {
+  z-index: 2;
+}
+
+.field,
+.field input,
+.field select,
+.field textarea {
+  z-index: 3;
+  pointer-events: auto;
+}
+
 @media (max-width: 720px) {
   body.app-ready:not([data-view="dashboard"]) .period-switcher {
     position: fixed;
@@ -105,6 +129,12 @@ body.app-ready .period-switcher {
     gap: 6px;
     align-items: center;
     padding: 0;
+    pointer-events: none;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact,
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact select {
+    pointer-events: auto;
   }
 
   body.app-ready[data-view="dashboard"] .period-switcher {
@@ -3208,7 +3238,7 @@ button.list-item {
   }
 
   body.app-ready:not([data-view="dashboard"]) .shell {
-    padding-top: 16px;
+    padding-top: 76px;
   }
 
   .mobile-app-brand {
