@@ -2496,8 +2496,8 @@ function renderFixedBills() {
       </div>
     </section>
     <div class="mode-picker fixed-tabs">
-      <button class="${fixedTab === "cash" ? "active" : ""}" type="button" data-fixed-tab="cash">Fora do cartão</button>
-      <button class="${fixedTab === "card" ? "active" : ""}" type="button" data-fixed-tab="card">No cartão</button>
+      <button class="${fixedTab === "cash" ? "active" : ""}" type="button" data-fixed-tab="cash">Contas fora do cartão</button>
+      <button class="${fixedTab === "card" ? "active" : ""}" type="button" data-fixed-tab="card">Fixos no cartão</button>
     </div>
     <div class="fixed-tab-panel ${fixedTab === "cash" ? "active" : ""}">
     <form class="settings-form" id="fixed-form">
@@ -2519,7 +2519,7 @@ function renderFixedBills() {
     </div>
     <div class="fixed-tab-panel ${fixedTab === "card" ? "active" : ""}">
     <form class="settings-form" id="card-recurring-form">
-      <div class="span-3 form-heading"><span>▣</span><div><h2>Nova assinatura no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Novo fixo no cartão</h2><small>Para internet cobrada no cartão, streaming, apps e assinaturas mensais.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -2528,7 +2528,7 @@ function renderFixedBills() {
       <button class="primary form-submit" type="submit">Salvar fixo no cartão</button>
     </form>
     <div class="panel soft-panel">
-      <div class="section-title"><span>↻</span><div><h2>Assinaturas no cartão</h2><small>Entram na fatura do mês e podem ser marcadas como pagas.</small></div></div>
+      <div class="section-title"><span>↻</span><div><h2>Fixos no cartão</h2><small>Entram na fatura do mês, diminuem o limite e aparecem no extrato do cartão.</small></div></div>
       <div class="wallet-list">
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
@@ -2659,6 +2659,7 @@ function renderCards() {
   const cardAvailable = cardLimit - cardUsed;
   const currentCard = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
   const otherCards = state.cards.filter((item) => !sameCard(item.name, currentCard?.name));
+  const currentSummary = currentCard ? cardStatementSummary(currentCard) : null;
   qs("#cards").innerHTML = `
     <section class="feature-hero cards-hero">
       <div>
@@ -2672,8 +2673,16 @@ function renderCards() {
         <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
       </div>
     </section>
-    <button class="ghost card-setup-toggle" type="button" data-toggle-card-setup>${cardSetupOpen ? "Ocultar cadastro" : "Adicionar cartão"}</button>
-    <div class="cards-layout">
+    <div class="card-command-bar panel">
+      <label class="field statement-card-select">
+        <span>Cartão selecionado</span>
+        <select id="invoice-card-detail-select">
+          ${state.cards.length ? state.cards.map((item) => `<option ${currentCard && sameCard(item.name, currentCard.name) ? "selected" : ""}>${item.name}</option>`).join("") : `<option>Nenhum cartão cadastrado</option>`}
+        </select>
+      </label>
+      <button class="ghost card-setup-toggle" type="button" data-toggle-card-setup>${cardSetupOpen ? "Ocultar cadastro" : "Adicionar cartão"}</button>
+    </div>
+    <div class="cards-layout ${cardSetupOpen ? "" : "invoice-only"}">
       ${cardSetupOpen ? `<form class="entry-form guided-form card-setup-card" id="card-settings-form">
         <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Limite, fechamento e vencimento.</small></div></div>
         ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
@@ -2685,21 +2694,15 @@ function renderCards() {
         <button class="primary" type="submit">Salvar cartão</button>
       </form>` : ""}
       <div class="panel soft-panel invoice-focus">
-        <div class="section-title"><span>▣</span><div><h2>Fatura atual</h2><small>${currentCard ? `${currentCard.name} · ${state.selectedMonth}/${state.selectedYear}` : "Cadastre um cartão para começar."}</small></div></div>
-        ${currentCard ? cardInvoiceRow(currentCard) : emptyHtml()}
-      </div>
-    </div>
-    <div class="panel soft-panel">
-      <div class="section-title"><span>▣</span><div><h2>Meus cartões</h2><small>Limite, vencimento, fechamento e fatura atual.</small></div></div>
-      <div class="grid-3 card-grid">
-        ${state.cards.map(cardSummary).join("") || emptyHtml()}
+        <div class="section-title"><span>▣</span><div><h2>${currentCard ? `Fatura ${currentCard.name}` : "Fatura atual"}</h2><small>${currentCard ? `${state.selectedMonth}/${state.selectedYear} · aberto ${formatMoney(currentSummary.open)}` : "Cadastre um cartão para começar."}</small></div></div>
+        ${currentCard ? selectedCardOverview(currentCard) : emptyHtml()}
       </div>
     </div>
     ${otherCards.length ? `
       <div class="panel soft-panel">
-        <div class="section-title"><span>☷</span><div><h2>Outras faturas</h2><small>Os demais cartões do mês.</small></div></div>
-        <div class="list">
-          ${otherCards.map(cardInvoiceRow).join("")}
+        <div class="section-title"><span>▣</span><div><h2>Outros cartões</h2><small>Toque em detalhes para abrir a fatura.</small></div></div>
+        <div class="grid-3 card-grid compact-card-grid">
+          ${otherCards.map(cardSummary).join("")}
         </div>
       </div>
     ` : ""}
@@ -2714,6 +2717,28 @@ function renderCards() {
   });
 }
 
+function selectedCardOverview(card) {
+  const totals = cardTotals(card.name);
+  const summary = cardStatementSummary(card);
+  const available = Number(card.limit || 0) - totals.used;
+  return `
+    <div class="selected-card-overview">
+      ${cardSummary(card)}
+      <div class="invoice-summary-panel">
+        <div class="invoice-numbers">
+          <div><span>Fatura total</span><strong>${formatMoney(summary.invoiceTotal)}</strong></div>
+          <div><span>Pago</span><strong>${formatMoney(summary.paidTotal)}</strong></div>
+          <div><span>Em aberto</span><strong>${formatMoney(summary.open)}</strong></div>
+          <div><span>Limite livre</span><strong>${formatMoney(available)}</strong></div>
+        </div>
+        <div class="card-actions">
+          ${summary.open > 0 ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar parcial</button><button class="tiny ghost" data-pay-card-month="${card.name}">Quitar fatura</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function cardDetailHtml() {
   const card = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
   if (!card) return "";
@@ -2723,12 +2748,6 @@ function cardDetailHtml() {
   return `
     <div class="panel soft-panel card-detail-panel" id="card-detail-panel">
       <div class="section-title"><span>▣</span><div><h2>Compras e pagamentos: ${card.name}</h2><small>Total ${formatMoney(summary.invoiceTotal)} · pago ${formatMoney(summary.paidTotal)} · aberto ${formatMoney(summary.open)}</small></div></div>
-      <label class="field statement-card-select">
-        <span>Ver cartão</span>
-        <select id="invoice-card-detail-select">
-          ${state.cards.map((item) => `<option ${sameCard(item.name, card.name) ? "selected" : ""}>${item.name}</option>`).join("")}
-        </select>
-      </label>
       <div class="grid-2">
         <div class="list">
           <h2>Itens da fatura</h2>
@@ -2828,7 +2847,7 @@ function cardSummary(card) {
   const totals = cardTotals(card.name);
   const available = Number(card.limit || 0) - totals.used;
   const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
-  return `<article class="credit-card ${card.color || "Azul"}">
+  return `<article class="credit-card ${card.color || "Azul"} ${selectedInvoiceCard && sameCard(card.name, selectedInvoiceCard) ? "selected" : ""}">
     <div>
       <span>Cartão de crédito${card.owner ? ` · ${card.owner}` : ""}</span>
       <strong>${card.name}</strong>

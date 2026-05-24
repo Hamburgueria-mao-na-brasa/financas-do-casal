@@ -1741,6 +1741,18 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   margin-top: 12px;
 }
 
+.card-command-bar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-command-bar .statement-card-select {
+  flex: 1;
+  max-width: 420px;
+}
+
 .statement-tools {
   display: grid;
   grid-template-columns: minmax(220px, .9fr) minmax(320px, 1.1fr);
@@ -2173,6 +2185,10 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   align-items: stretch;
 }
 
+.cards-layout.invoice-only {
+  grid-template-columns: 1fr;
+}
+
 .cards-layout:has(.invoice-focus:only-child) {
   grid-template-columns: 1fr;
 }
@@ -2194,6 +2210,59 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   height: calc(100% - 54px);
   display: grid;
   align-content: start;
+}
+
+.selected-card-overview {
+  display: grid;
+  grid-template-columns: minmax(280px, .85fr) minmax(260px, 1.15fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.selected-card-overview .credit-card {
+  margin: 0;
+}
+
+.invoice-summary-panel {
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .72);
+}
+
+.invoice-numbers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.invoice-numbers div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .70);
+}
+
+.invoice-numbers span,
+.invoice-numbers strong {
+  display: block;
+}
+
+.invoice-numbers span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.invoice-numbers strong {
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.compact-card-grid .credit-card {
+  min-height: 250px;
 }
 
 .settings-stack {
@@ -2979,7 +3048,7 @@ button.list-item {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid-2, .entry-form, .bank-home, .guided-form, .cards-layout, .entries-split {
+  .grid-2, .entry-form, .bank-home, .guided-form, .cards-layout, .entries-split, .selected-card-overview {
     grid-template-columns: 1fr;
   }
 
