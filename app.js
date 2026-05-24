@@ -55,6 +55,9 @@ let statementCardFilter = "Todos";
 let statementSearch = "";
 let statementStatusFilter = "Todos";
 let selectedInvoiceCard = "";
+let statementFiltersOpen = false;
+let fixedTab = "cash";
+let cardSetupOpen = false;
 let confirmAction = null;
 let currentActionOptions = [];
 let toastTimer = null;
@@ -1592,10 +1595,10 @@ function renderDashboard() {
     </section>
     ${initialSetupPanel()}
     <div class="summary-grid bank-metrics compact-dashboard">
-      ${metric("Entradas", summary.income + summary.salaryTotal, "good")}
-      ${metric("Saídas", summary.expense + summary.fixedPaid, "bad")}
-      ${metric("Cartões", summary.cardMonth, "info")}
-      ${metric("Metas", summary.goalsSaved, "good")}
+      ${metric("Entradas", summary.income + summary.salaryTotal, "good", "statement")}
+      ${metric("Saídas", summary.expense + summary.fixedPaid, "bad", "statement")}
+      ${metric("Cartões", summary.cardMonth, "info", "cards")}
+      ${metric("Metas", summary.goalsSaved, "good", "goals")}
     </div>
     ${dashboardInvoicesHtml()}
     <div class="grid-2">
@@ -2046,8 +2049,9 @@ function coupleIllustration(mood) {
   `;
 }
 
-function metric(label, value, tone) {
-  return `<article class="metric ${tone}"><span>${label}</span><strong>${formatMoney(value)}</strong></article>`;
+function metric(label, value, tone, view = "") {
+  const attr = view ? ` role="button" tabindex="0" data-view="${view}"` : "";
+  return `<article class="metric ${tone} ${view ? "clickable" : ""}"${attr}><span>${label}</span><strong>${formatMoney(value)}</strong></article>`;
 }
 
 function statementItem(item) {
@@ -2092,6 +2096,7 @@ function renderEntries() {
         <div><span>Pendente</span><strong>${formatMoney(pendingExpense)}</strong></div>
       </div>
     </section>
+    <div class="entries-split">
     <form class="entry-form guided-form" id="entry-form">
       <div class="span-3 form-heading"><span>${editing ? "✎" : "+"}</span><div><h2>${editing ? "Editar lançamento" : "Novo lançamento"}</h2><small>Use para Pix, débito, dinheiro e entradas avulsas.</small></div></div>
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
@@ -2120,6 +2125,7 @@ function renderEntries() {
       ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
       <button class="primary" type="submit">Salvar compra no cartão</button>
     </form>
+    </div>
     <div class="panel soft-panel">
       <div class="section-title"><span>☷</span><div><h2>Lançamentos do mês</h2><small>Filtre, edite ou exclua quando precisar.</small></div></div>
       <div class="mode-picker filter-tabs">
@@ -2323,7 +2329,8 @@ function renderStatement() {
         <div><span>Cartões</span><strong>${formatMoney(rowsSummary.card)}</strong></div>
       </div>
     </section>
-    <div class="statement-tools panel">
+    <button class="ghost statement-filter-toggle" type="button" data-toggle-statement-filters>${statementFiltersOpen ? "Ocultar filtros" : "Filtros"}</button>
+    <div class="statement-tools panel ${statementFiltersOpen ? "open" : "collapsed"}">
       <label class="field">
         <span>Buscar no extrato</span>
         <input id="statement-search" type="search" value="${statementSearch}" placeholder="Ex: aluguel, Nubank, mercado">
@@ -2488,6 +2495,11 @@ function renderFixedBills() {
         <div><span>No cartão</span><strong>${formatMoney(cardFixed)}</strong></div>
       </div>
     </section>
+    <div class="mode-picker fixed-tabs">
+      <button class="${fixedTab === "cash" ? "active" : ""}" type="button" data-fixed-tab="cash">Fora do cartão</button>
+      <button class="${fixedTab === "card" ? "active" : ""}" type="button" data-fixed-tab="card">No cartão</button>
+    </div>
+    <div class="fixed-tab-panel ${fixedTab === "cash" ? "active" : ""}">
     <form class="settings-form" id="fixed-form">
       <div class="span-3 form-heading"><span>◷</span><div><h2>Nova conta fixa</h2><small>Para aluguel, internet, energia, empréstimos e mensalidades fora do cartão.</small></div></div>
       ${input("name", "Nome da conta", "text", "", "", "Ex: aluguel, internet, energia, empréstimo.")}
@@ -2504,6 +2516,8 @@ function renderFixedBills() {
         ${(state.fixedBills || []).length ? state.fixedBills.map(fixedBillCard).join("") : emptyHtml()}
       </div>
     </div>
+    </div>
+    <div class="fixed-tab-panel ${fixedTab === "card" ? "active" : ""}">
     <form class="settings-form" id="card-recurring-form">
       <div class="span-3 form-heading"><span>▣</span><div><h2>Nova assinatura no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
@@ -2519,9 +2533,18 @@ function renderFixedBills() {
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
     </div>
+    </div>
   `;
-  qs("#fixed-form").addEventListener("submit", addFixedBill);
-  qs("#card-recurring-form").addEventListener("submit", addCardRecurring);
+  const fixedForm = qs("#fixed-form");
+  if (fixedForm) fixedForm.addEventListener("submit", addFixedBill);
+  const cardRecurringForm = qs("#card-recurring-form");
+  if (cardRecurringForm) cardRecurringForm.addEventListener("submit", addCardRecurring);
+  document.querySelectorAll("[data-fixed-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      fixedTab = button.dataset.fixedTab;
+      renderFixedBills();
+    });
+  });
 }
 
 function renderAgenda() {
@@ -2649,8 +2672,9 @@ function renderCards() {
         <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
       </div>
     </section>
+    <button class="ghost card-setup-toggle" type="button" data-toggle-card-setup>${cardSetupOpen ? "Ocultar cadastro" : "Adicionar cartão"}</button>
     <div class="cards-layout">
-      <form class="entry-form guided-form card-setup-card" id="card-settings-form">
+      ${cardSetupOpen ? `<form class="entry-form guided-form card-setup-card" id="card-settings-form">
         <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Limite, fechamento e vencimento.</small></div></div>
         ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
         ${select("owner", "Titular", appPeople(), "", "Pessoa responsável pelo cartão.")}
@@ -2659,7 +2683,7 @@ function renderCards() {
         ${input("dueDay", "Dia de vencimento", "number", "10", "1", "Dia em que a fatura vence.")}
         ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda o visual do cartão.")}
         <button class="primary" type="submit">Salvar cartão</button>
-      </form>
+      </form>` : ""}
       <div class="panel soft-panel invoice-focus">
         <div class="section-title"><span>▣</span><div><h2>Fatura atual</h2><small>${currentCard ? `${currentCard.name} · ${state.selectedMonth}/${state.selectedYear}` : "Cadastre um cartão para começar."}</small></div></div>
         ${currentCard ? cardInvoiceRow(currentCard) : emptyHtml()}
@@ -2681,7 +2705,8 @@ function renderCards() {
     ` : ""}
     ${cardDetailHtml()}
   `;
-  qs("#card-settings-form").addEventListener("submit", addCard);
+  const cardSettingsForm = qs("#card-settings-form");
+  if (cardSettingsForm) cardSettingsForm.addEventListener("submit", addCard);
   const detailSelect = qs("#invoice-card-detail-select");
   if (detailSelect) detailSelect.addEventListener("change", (event) => {
     selectedInvoiceCard = event.target.value;
@@ -3548,6 +3573,20 @@ document.addEventListener("click", async (event) => {
   if (installHelpButton) {
     modalMode = { kind: "installHelp", id: "install", fields: [] };
     renderModal();
+    return;
+  }
+
+  const statementFilterToggle = event.target.closest("[data-toggle-statement-filters]");
+  if (statementFilterToggle) {
+    statementFiltersOpen = !statementFiltersOpen;
+    renderStatement();
+    return;
+  }
+
+  const cardSetupToggle = event.target.closest("[data-toggle-card-setup]");
+  if (cardSetupToggle) {
+    cardSetupOpen = !cardSetupOpen;
+    renderCards();
     return;
   }
 

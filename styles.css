@@ -920,6 +920,15 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   gap: 14px;
 }
 
+.metric.clickable {
+  cursor: pointer;
+}
+
+.metric.clickable:focus {
+  outline: 3px solid rgba(19, 216, 255, .35);
+  outline-offset: 3px;
+}
+
 .bank-home {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
@@ -1722,6 +1731,12 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.statement-filter-toggle,
+.card-setup-toggle {
+  justify-self: start;
+  width: auto;
+}
+
 .card-grid {
   margin-top: 12px;
 }
@@ -1731,6 +1746,10 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   grid-template-columns: minmax(220px, .9fr) minmax(320px, 1.1fr);
   gap: 12px;
   align-items: end;
+}
+
+.statement-tools.collapsed {
+  display: none;
 }
 
 .card-statement-panel {
@@ -2133,6 +2152,10 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   align-items: stretch;
 }
 
+.cards-layout:has(.invoice-focus:only-child) {
+  grid-template-columns: 1fr;
+}
+
 .cards-layout .entry-form,
 .cards-layout .invoice-focus {
   height: 100%;
@@ -2167,6 +2190,25 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.entries-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.fixed-tabs {
+  max-width: 520px;
+}
+
+.fixed-tab-panel {
+  display: none;
+  gap: 18px;
+}
+
+.fixed-tab-panel.active {
+  display: grid;
 }
 
 .settings-form h2 {
@@ -2916,7 +2958,7 @@ button.list-item {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid-2, .entry-form, .bank-home, .guided-form, .cards-layout {
+  .grid-2, .entry-form, .bank-home, .guided-form, .cards-layout, .entries-split {
     grid-template-columns: 1fr;
   }
 
