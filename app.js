@@ -50,6 +50,7 @@ let entryFilter = "Todos";
 let statementFilter = "Todos";
 let statementCardFilter = "Todos";
 let statementSearch = "";
+let statementStatusFilter = "Todos";
 let selectedInvoiceCard = "";
 let confirmAction = null;
 let currentActionOptions = [];
@@ -106,6 +107,7 @@ function ensureStateShape() {
   state.profile.salaryDayTwo = Number(state.profile.salaryDayTwo || 5);
   state.recurring ||= [];
   state.budgets ||= {};
+  state.closedMonths ||= [];
   state.notificationMarks ||= {};
   if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
   if (typeof state.tutorialDone !== "boolean") state.tutorialDone = false;
@@ -144,6 +146,10 @@ function monthIndex(month) {
 
 function periodKey(month = state.selectedMonth, year = state.selectedYear) {
   return `${year}:${month}`;
+}
+
+function isMonthClosed(month = state.selectedMonth, year = state.selectedYear) {
+  return (state.closedMonths || []).includes(periodKey(month, year));
 }
 
 function getInstallmentSchedule(item) {
@@ -2176,6 +2182,8 @@ function renderStatement() {
   rows = rows.filter((item) => {
     if (statementFilter !== "Todos" && item.kind !== statementFilter) return false;
     if (statementFilter === "Cartão" && statementCardFilter !== "Todos" && item.card !== statementCardFilter && !String(item.detail || "").includes(statementCardFilter)) return false;
+    if (statementStatusFilter === "Aberto" && !String(item.detail || "").includes("Aberto") && !String(item.detail || "").includes("Pendente")) return false;
+    if (statementStatusFilter === "Pago" && !String(item.detail || "").includes("Pago") && !String(item.detail || "").includes("pagamento")) return false;
     if (!query) return true;
     return [item.title, item.detail, item.kind, item.value].join(" ").toLowerCase().includes(query);
   });
@@ -2193,6 +2201,9 @@ function renderStatement() {
       </label>
       <div class="mode-picker filter-tabs">
         ${["Todos", "Entrada", "Saída", "Cartão", "Conta fixa"].map((filter) => `<button class="${statementFilter === filter ? "active" : ""}" type="button" data-statement-filter="${filter}">${filter}</button>`).join("")}
+      </div>
+      <div class="mode-picker filter-tabs compact-filter">
+        ${["Todos", "Aberto", "Pago"].map((filter) => `<button class="${statementStatusFilter === filter ? "active" : ""}" type="button" data-statement-status="${filter}">${filter}</button>`).join("")}
       </div>
     </div>
     ${statementFilter === "Cartão" ? `
@@ -2221,6 +2232,12 @@ function renderStatement() {
     button.addEventListener("click", () => {
       statementFilter = button.dataset.statementFilter;
       if (statementFilter !== "Cartão") statementCardFilter = "Todos";
+      renderStatement();
+    });
+  });
+  document.querySelectorAll("[data-statement-status]").forEach((button) => {
+    button.addEventListener("click", () => {
+      statementStatusFilter = button.dataset.statementStatus;
       renderStatement();
     });
   });
