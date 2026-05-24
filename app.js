@@ -1094,7 +1094,7 @@ function actionOption(label, icon, dataset) {
 }
 
 function optionButton(kind, id) {
-  return `<button class="tiny ghost" data-options-kind="${kind}" data-options-id="${id}">Opções</button>`;
+  return `<button class="tiny ghost" type="button" data-options-kind="${kind}" data-options-id="${id}">Opções</button>`;
 }
 
 function saveQuickEntry(event) {
@@ -2099,7 +2099,7 @@ function renderEntries() {
       </div>
     </section>
     <div class="entries-split">
-    <form class="entry-form guided-form" id="entry-form">
+    <form class="entry-form guided-form" id="entry-form" novalidate>
       <div class="span-3 form-heading"><span>${editing ? "✎" : "+"}</span><div><h2>${editing ? "Editar lançamento" : "Novo lançamento"}</h2><small>Use para Pix, débito, dinheiro e entradas avulsas.</small></div></div>
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
         <button class="${entryMode === "Receita" ? "active" : ""}" type="button" data-entry-mode="Receita">Entrada</button>
@@ -2117,7 +2117,7 @@ function renderEntries() {
       <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
       ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
     </form>
-    <form class="entry-form guided-form" id="card-form">
+    <form class="entry-form guided-form" id="card-form" novalidate>
       <div class="span-3 form-heading"><span>▣</span><div><h2>Compra no cartão</h2><small>Lance a compra aqui. O app divide parcelas e joga na fatura do cartão.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada. Cadastre cartões na aba Cartões.")} 
       ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
@@ -2145,26 +2145,12 @@ function renderEntries() {
       ]))}
     </div>
   `;
-  qs("#entry-form").addEventListener("submit", addEntry);
-  qs("#card-form").addEventListener("submit", addInstallment);
   const recurringButton = qs("#generate-recurring");
   if (recurringButton) recurringButton.addEventListener("click", generateRecurring);
   const cancel = qs("#cancel-edit");
   if (cancel) cancel.addEventListener("click", () => {
     editingEntryId = null;
     renderEntries();
-  });
-  document.querySelectorAll("[data-entry-mode]").forEach((button) => {
-    button.addEventListener("click", () => {
-      entryMode = button.dataset.entryMode;
-      renderEntries();
-    });
-  });
-  document.querySelectorAll("[data-entry-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      entryFilter = button.dataset.entryFilter;
-      renderEntries();
-    });
   });
 }
 
@@ -2214,20 +2200,30 @@ function generateRecurring() {
 function addEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
+  const value = Number(String(data.value || "").replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) {
+    showToast("Informe um valor maior que zero", "error");
+    return;
+  }
+  if (!data.date) {
+    showToast("Informe a data do lançamento", "error");
+    return;
+  }
   const entryDate = dateInfo(data.date);
+  const isIncome = entryMode === "Receita";
   const payload = {
     id: editingEntryId || crypto.randomUUID(),
     date: data.date,
     month: entryDate.month,
     type: entryMode,
-    category: data.category,
-    description: data.description,
-    value: Number(data.value || 0),
-    person: data.person,
+    category: data.category || (isIncome ? state.categoriesIncome[0] : state.categoriesExpense[0]) || (isIncome ? "Entrada" : "Saída"),
+    description: data.description || (isIncome ? "Entrada sem descrição" : "Saída sem descrição"),
+    value,
+    person: data.person || appPeople()[0],
     payment: data.payment || "Recebimento",
-    account: data.account,
+    account: data.account || accountOptions()[0],
     status: data.status || "Pago",
-    notes: data.notes
+    notes: data.notes || ""
   };
   if (editingEntryId) {
     state.entries = state.entries.map((item) => item.id === editingEntryId ? payload : item);
@@ -2884,22 +2880,31 @@ function addInstallment(event) {
     setActiveView("cards");
     return;
   }
+  const value = Number(String(data.value || "").replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) {
+    showToast("Informe o valor da compra", "error");
+    return;
+  }
+  if (!data.date) {
+    showToast("Informe a data da compra", "error");
+    return;
+  }
   const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
   const firstMonth = invoicePeriod.month;
   const firstYear = Number(invoicePeriod.year);
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
-    card: data.card,
-    description: data.description,
-    category: data.category,
-    value: Number(data.value || 0),
-    parts: Number(data.parts || 1),
+    card: data.card || state.cards[0].name,
+    description: data.description || "Compra no cartão",
+    category: data.category || state.categoriesExpense[0] || "Cartão",
+    value,
+    parts: Math.max(1, Number(data.parts || 1)),
     firstMonth,
     firstYear,
     paidMonths: []
   });
-  notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
+  notify("card", `Compra no cartão: ${data.description || data.card || "Compra"} · ${formatMoney(value)}`);
   commitState();
 }
 
@@ -3335,9 +3340,9 @@ function personAvatar(name, tone) {
 
 function categoryRow(item, kind) {
   return `
-    <div class="list-item">
+    <div class="list-item category-row">
       <strong>${item}</strong>
-      <span>
+      <span class="category-actions">
         <button class="tiny ghost" data-edit-category="${kind}|${item}">Editar</button>
         <button class="tiny danger" data-delete-category="${kind}|${item}">Excluir</button>
       </span>
@@ -3577,6 +3582,18 @@ function setActiveView(view) {
   renderViewContent(view);
 }
 
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  if (form.id === "entry-form") {
+    addEntry(event);
+    return;
+  }
+  if (form.id === "card-form") {
+    addInstallment(event);
+  }
+});
+
 document.addEventListener("click", async (event) => {
   if (
     notificationsOpen &&
@@ -3591,6 +3608,20 @@ document.addEventListener("click", async (event) => {
   if (tab) {
     if (tab.dataset.setupWallet) walletTab = tab.dataset.setupWallet;
     setActiveView(tab.dataset.view);
+  }
+
+  const entryModeButton = event.target.closest("[data-entry-mode]");
+  if (entryModeButton) {
+    entryMode = entryModeButton.dataset.entryMode;
+    renderEntries();
+    return;
+  }
+
+  const entryFilterButton = event.target.closest("[data-entry-filter]");
+  if (entryFilterButton) {
+    entryFilter = entryFilterButton.dataset.entryFilter;
+    renderEntries();
+    return;
   }
 
   const notificationButton = event.target.closest("[data-notification-id]");
