@@ -59,6 +59,7 @@ let confirmAction = null;
 let currentActionOptions = [];
 let toastTimer = null;
 let lastLocalEditAt = 0;
+let deferredInstallPrompt = null;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const tutorialSteps = [
@@ -831,6 +832,14 @@ function renderModal() {
   document.body.classList.add("modal-open");
   modal.classList.add("open");
   if (typeof modalMode === "object") {
+    if (modalMode.kind === "installHelp") {
+      modal.innerHTML = installHelpHtml();
+      qs("#close-modal").addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      }, { once: true });
+      return;
+    }
     modal.innerHTML = editModalHtml(modalMode);
     qs("#close-modal").addEventListener("click", closeModal);
     modal.addEventListener("click", (event) => {
@@ -906,6 +915,31 @@ function renderModal() {
     if (event.target === modal) closeModal();
   }, { once: true });
   qs("#quick-form").addEventListener("submit", saveQuickEntry);
+}
+
+function installHelpHtml() {
+  const canInstall = Boolean(deferredInstallPrompt);
+  return `
+    <div class="modal-card install-card">
+      <div class="modal-head">
+        <strong>Instalar o DuoFin</strong>
+        <button class="ghost tiny" id="close-modal" type="button">Fechar</button>
+      </div>
+      <div class="tutorial-body install-steps">
+        ${canInstall ? `
+          <h2>Instalar agora</h2>
+          <p>Seu navegador permite instalar o DuoFin como aplicativo neste aparelho.</p>
+          <button class="primary" type="button" data-install-now>Instalar DuoFin</button>
+        ` : `
+          <h2>Android</h2>
+          <p>No Chrome, toque no menu de três pontos e escolha <b>Adicionar à tela inicial</b> ou <b>Instalar app</b>.</p>
+        `}
+        <h2>iPhone</h2>
+        <p>No Safari, toque em compartilhar e escolha <b>Adicionar à Tela de Início</b>.</p>
+        <small>Depois disso ele abre como aplicativo, mas continua sincronizando pelo mesmo login.</small>
+      </div>
+    </div>
+  `;
 }
 
 function editModalHtml(config) {
@@ -3445,7 +3479,7 @@ function setActiveView(view) {
   document.body.dataset.view = view;
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   if (
     notificationsOpen &&
     !event.target.closest("#notifications-panel") &&
@@ -3511,6 +3545,20 @@ document.addEventListener("click", (event) => {
   if (installHelpButton) {
     modalMode = { kind: "installHelp", id: "install", fields: [] };
     renderModal();
+    return;
+  }
+
+  const installNowButton = event.target.closest("[data-install-now]");
+  if (installNowButton) {
+    if (!deferredInstallPrompt) {
+      showToast("Este navegador não liberou instalação direta", "info");
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    closeModal();
+    showToast(choice?.outcome === "accepted" ? "Instalação iniciada" : "Instalação cancelada", "info");
     return;
   }
 
@@ -3788,6 +3836,14 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("pagehide", rememberAwayTime);
 window.addEventListener("focus", requireLoginAfterAway);
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  showToast("DuoFin instalado neste aparelho", "success");
+});
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});

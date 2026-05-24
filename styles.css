@@ -714,6 +714,18 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher {
   -webkit-overflow-scrolling: touch;
 }
 
+.notification-group {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-group h2 {
+  margin: 8px 2px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
 .notification-item {
   width: 100%;
   display: grid;
@@ -766,6 +778,17 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher {
 .notification-item small {
   color: var(--muted);
   margin-top: 4px;
+}
+
+.smart-phrase {
+  margin: 0 0 12px;
+  padding: 12px;
+  color: #071b1b;
+  font-weight: 900;
+  line-height: 1.35;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(0, 224, 154, .18), rgba(19, 216, 255, .14));
+  border: 1px solid rgba(0, 168, 107, .18);
 }
 
 .app-toast {
@@ -3662,8 +3685,15 @@ button.list-item {
   .helper-panel p,
   .list-item span,
   .wallet-account span,
+  .notification-group h2,
   .wallet-account small {
     color: var(--muted);
+  }
+
+  .smart-phrase {
+    color: #f2fff9;
+    background: rgba(0, 224, 154, .12);
+    border-color: rgba(0, 224, 154, .22);
   }
 
   .list-item,
