@@ -755,11 +755,24 @@ function renderNotifications() {
 }
 
 function notificationGroups(items) {
+  const partner = [];
+  const bills = [];
+  const system = [];
+  const mine = [];
+  items.forEach((item) => {
+    const text = item.text?.toLowerCase() || "";
+    const isPartner = item.source !== "auto" && item.actorId && item.actorId !== currentActorId();
+    const isBill = item.type === "card" || text.includes("vence") || text.includes("fatura");
+    if (isPartner) partner.push(item);
+    else if (isBill) bills.push(item);
+    else if (item.source === "auto") system.push(item);
+    else mine.push(item);
+  });
   return [
-    ["Mudanças do parceiro", items.filter((item) => item.source !== "auto" && item.actorId && item.actorId !== currentActorId())],
-    ["Contas e faturas", items.filter((item) => item.type === "card" || item.text?.toLowerCase().includes("vence") || item.text?.toLowerCase().includes("fatura"))],
-    ["Alertas do sistema", items.filter((item) => item.source === "auto" && item.type !== "card" && !item.text?.toLowerCase().includes("vence"))],
-    ["Minhas alterações", items.filter((item) => item.source !== "auto" && (!item.actorId || item.actorId === currentActorId()))]
+    ["Mudanças do parceiro", partner],
+    ["Contas e faturas", bills],
+    ["Alertas do sistema", system],
+    ["Minhas alterações", mine]
   ];
 }
 
@@ -2066,7 +2079,6 @@ function renderEntries() {
   const entryIncome = total(monthEntries.filter((item) => item.type === "Receita"));
   const entryExpense = total(monthEntries.filter((item) => item.type === "Despesa"));
   const pendingExpense = total(monthEntries.filter((item) => item.type === "Despesa" && item.status === "Pendente"));
-  const recentCardRows = state.installments.slice(0, 5);
   qs("#entries").innerHTML = `
     <section class="feature-hero entries-hero">
       <div>
@@ -2122,16 +2134,6 @@ function renderEntries() {
       pill(item.person, item.person.toLowerCase()),
       pill(item.status, item.status.toLowerCase()),
       `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
-      ]))}
-    </div>
-    <div class="panel soft-panel">
-      <div class="section-title"><span>▣</span><div><h2>Compras recentes no cartão</h2><small>As compras do crédito também aparecem no Extrato e nas faturas.</small></div></div>
-      ${table(["Compra", "Cartão", "Valor", "Parcelas", ""], recentCardRows.map((item) => [
-        item.description,
-        item.card,
-        `<td class="amount">${formatMoney(item.value)}</td>`,
-        item.parts,
-        `<button class="tiny ghost" data-edit-installment="${item.id}">Editar</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir</button>`
       ]))}
     </div>
   `;
@@ -2633,6 +2635,7 @@ function renderCards() {
   const cardUsed = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
   const cardAvailable = cardLimit - cardUsed;
   const currentCard = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
+  const otherCards = state.cards.filter((item) => !sameCard(item.name, currentCard?.name));
   qs("#cards").innerHTML = `
     <section class="feature-hero cards-hero">
       <div>
@@ -2668,12 +2671,14 @@ function renderCards() {
         ${state.cards.map(cardSummary).join("") || emptyHtml()}
       </div>
     </div>
-    <div class="panel soft-panel">
-      <div class="section-title"><span>☷</span><div><h2>Todas as faturas</h2><small>Troque o cartão nos detalhes para ver compras e pagamentos.</small></div></div>
-      <div class="list">
-        ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
+    ${otherCards.length ? `
+      <div class="panel soft-panel">
+        <div class="section-title"><span>☷</span><div><h2>Outras faturas</h2><small>Os demais cartões do mês.</small></div></div>
+        <div class="list">
+          ${otherCards.map(cardInvoiceRow).join("")}
+        </div>
       </div>
-    </div>
+    ` : ""}
     ${cardDetailHtml()}
   `;
   qs("#card-settings-form").addEventListener("submit", addCard);

@@ -572,7 +572,7 @@ h2 {
   display: none;
 }
 
-body.app-ready:not([data-view="dashboard"]) .top-actions::before {
+body.app-ready:not([data-view="dashboard"]) .top-actions.period-label-old::before {
   content: "Período";
   align-self: center;
   min-height: 48px;
@@ -588,7 +588,7 @@ body.app-ready:not([data-view="dashboard"]) .top-actions::before {
   box-shadow: 0 10px 20px rgba(22, 52, 47, .06);
 }
 
-body.app-ready:not([data-view="dashboard"]) .period-switcher {
+body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old {
   display: flex;
 }
 
@@ -3968,7 +3968,7 @@ button.list-item {
     font-size: 16px;
   }
 
-  body.app-ready .period-switcher {
+  body.app-ready .period-switcher.period-switcher-old {
     display: contents;
   }
 
