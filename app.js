@@ -169,6 +169,20 @@ function periodKey(month = state.selectedMonth, year = state.selectedYear) {
   return `${year}:${month}`;
 }
 
+function dateInfo(dateValue) {
+  const date = new Date(`${dateValue || ""}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) {
+    return { month: state.selectedMonth, year: Number(state.selectedYear || new Date().getFullYear()), valid: false };
+  }
+  return { month: months[date.getUTCMonth()], year: date.getUTCFullYear(), valid: true };
+}
+
+function moveViewToPeriod(month, year) {
+  if (!month || !months.includes(month)) return;
+  state.selectedMonth = month;
+  state.selectedYear = Number(year || state.selectedYear || new Date().getFullYear());
+}
+
 function isMonthClosed(month = state.selectedMonth, year = state.selectedYear) {
   return (state.closedMonths || []).includes(periodKey(month, year));
 }
@@ -945,10 +959,11 @@ function saveEditModal(event) {
       const purchaseDate = new Date(`${data.date}T00:00:00Z`);
       const purchaseMonth = Number.isNaN(purchaseDate.getTime()) ? state.selectedMonth : months[purchaseDate.getUTCMonth()];
       const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
-      const firstMonth = data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
+      const dateOrCardChanged = data.date !== item.date || !sameCard(data.card, item.card);
+      const firstMonth = dateOrCardChanged || data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
       const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
       const inferredFirstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
-      const firstYear = Number(data.firstYear || inferredFirstYear);
+      const firstYear = dateOrCardChanged ? invoicePeriod.year : Number(data.firstYear || inferredFirstYear);
       Object.assign(item, {
         date: data.date,
         card: data.card,
@@ -959,6 +974,7 @@ function saveEditModal(event) {
         firstMonth,
         firstYear
       });
+      moveViewToPeriod(firstMonth, firstYear);
     }
   }
   if (data.kind === "cardRecurring") {
@@ -2129,10 +2145,11 @@ function generateRecurring() {
 function addEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
+  const entryDate = dateInfo(data.date);
   const payload = {
     id: editingEntryId || crypto.randomUUID(),
     date: data.date,
-    month: months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()],
+    month: entryDate.month,
     type: entryMode,
     category: data.category,
     description: data.description,
@@ -2146,6 +2163,7 @@ function addEntry(event) {
   if (editingEntryId) {
     state.entries = state.entries.map((item) => item.id === editingEntryId ? payload : item);
     editingEntryId = null;
+    moveViewToPeriod(entryDate.month, entryDate.year);
     notify("entry", `Lançamento editado: ${data.description || data.category}`);
   } else {
     state.entries.unshift(payload);
@@ -2752,6 +2770,7 @@ function addInstallment(event) {
     firstYear,
     paidMonths: []
   });
+  moveViewToPeriod(firstMonth, firstYear);
   notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
