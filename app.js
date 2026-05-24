@@ -52,6 +52,7 @@ let statementCardFilter = "Todos";
 let statementSearch = "";
 let selectedInvoiceCard = "";
 let confirmAction = null;
+let currentActionOptions = [];
 let toastTimer = null;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
@@ -799,6 +800,21 @@ function renderModal() {
     });
     return;
   }
+  if (modalMode === "itemActions") {
+    modal.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-head"><strong>Opções do item</strong><button class="ghost tiny" id="close-modal" type="button">Fechar</button></div>
+        <div class="quick-shortcuts action-options">
+          ${(currentActionOptions || []).map((item) => `<button class="quick-shortcut" type="button" ${item.dataset}><b>${item.icon}</b><span>${item.label}</span></button>`).join("")}
+        </div>
+      </div>
+    `;
+    qs("#close-modal").addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal();
+    }, { once: true });
+    return;
+  }
   modal.innerHTML = `
     <div class="modal-card">
       <div class="modal-head">
@@ -955,6 +971,20 @@ function askConfirm(action) {
   confirmAction = action;
   modalMode = "confirm";
   renderModal();
+}
+
+function openItemActions(options) {
+  currentActionOptions = options;
+  modalMode = "itemActions";
+  renderModal();
+}
+
+function actionOption(label, icon, dataset) {
+  return { label, icon, dataset };
+}
+
+function optionButton(kind, id) {
+  return `<button class="tiny ghost" data-options-kind="${kind}" data-options-id="${id}">Opções</button>`;
 }
 
 function saveQuickEntry(event) {
@@ -2096,7 +2126,7 @@ function renderStatement() {
       detail: `${item.category} · ${item.person} · ${item.status}`,
       value: Number(item.value || 0),
       tone: item.type === "Receita" ? "income" : "expense",
-      action: `<button class="tiny ghost" data-edit-entry="${item.id}">Editar</button> <button class="tiny danger" data-delete-entry="${item.id}">Excluir</button>`
+      action: optionButton("entry", item.id)
     })),
     ...state.installments.flatMap((item) => getInstallmentSchedule(item)
       .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear))
@@ -2108,7 +2138,7 @@ function renderStatement() {
         detail: `${item.card} · parcela ${index + 1}/${item.parts} · ${part.paid ? "Pago" : "Aberto"}`,
         value: Number(part.value || 0),
         tone: "card",
-        action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}|${part.year}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
+        action: optionButton("installment", `${item.id}|${part.month}|${part.year}|${part.paid ? "paid" : "open"}`)
       }))),
     ...cardRecurringItemsForInvoice().map((item) => ({
       id: item.id,
@@ -2118,7 +2148,7 @@ function renderStatement() {
       detail: `${item.card} · cobrança fixa · ${item.paid ? "Pago" : "Aberto"}`,
       value: Number(item.value || 0),
       tone: "card",
-      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${item.paid ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
+      action: optionButton("cardRecurring", `${item.id}|${item.paid ? "paid" : "open"}`)
     })),
     ...cardPaymentRows().map((item) => ({
       id: item.id,
@@ -2129,7 +2159,7 @@ function renderStatement() {
       value: Number(item.value || 0),
       tone: "card-payment",
       card: item.card,
-      action: `<button class="tiny ghost" data-edit-card-payment="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-payment="${item.id}">Excluir pagamento</button>`
+      action: optionButton("cardPayment", item.id)
     })),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
@@ -2139,7 +2169,7 @@ function renderStatement() {
       detail: `${item.category} · ${item.person} · ${isFixedPaid(item) ? "Pago" : "Pendente"}`,
       value: Number(item.value || 0),
       tone: isFixedPaid(item) ? "fixed-paid" : "fixed-pending",
-      action: `<button class="tiny ghost" data-toggle-fixed="${item.id}">${isFixedPaid(item) ? "Marcar pendente" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-fixed="${item.id}">Editar</button>`
+      action: optionButton("fixed", `${item.id}|${isFixedPaid(item) ? "paid" : "open"}`)
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
   const query = statementSearch.trim().toLowerCase();
@@ -2539,9 +2569,9 @@ function cardDetailHtml() {
 
 function invoiceItemActions(item) {
   if (item.source === "recurring") {
-    return `<button class="tiny ghost" data-toggle-card-recurring="${item.installmentId}">${item.paid ? "Reabrir" : "Marcar pago"}</button><button class="tiny ghost" data-edit-card-recurring="${item.installmentId}">Editar</button>`;
+    return optionButton("cardRecurring", `${item.installmentId}|${item.paid ? "paid" : "open"}`);
   }
-  return `<button class="tiny ghost" data-toggle-card-part="${item.installmentId}|${item.month}|${item.year}">${item.paid ? "Reabrir" : "Marcar pago"}</button><button class="tiny ghost" data-edit-installment="${item.installmentId}">Editar</button>`;
+  return optionButton("installment", `${item.installmentId}|${item.month}|${item.year}|${item.paid ? "paid" : "open"}`);
 }
 
 function cardRecurringRow(item) {
@@ -3296,6 +3326,39 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (event.target.dataset.optionsKind) {
+    const kind = event.target.dataset.optionsKind;
+    const id = event.target.dataset.optionsId;
+    const parts = String(id || "").split("|");
+    const optionsByKind = {
+      entry: [
+        actionOption("Editar", "✎", `data-edit-entry="${id}"`),
+        actionOption("Excluir", "×", `data-delete-entry="${id}"`)
+      ],
+      installment: [
+        actionOption(parts[3] === "paid" ? "Reabrir parcela" : "Marcar pago", "✓", `data-toggle-card-part="${parts[0]}|${parts[1]}|${parts[2]}"`),
+        actionOption("Editar compra", "✎", `data-edit-installment="${parts[0]}"`),
+        actionOption("Excluir compra", "×", `data-delete-installment="${parts[0]}"`)
+      ],
+      cardRecurring: [
+        actionOption(parts[1] === "paid" ? "Reabrir" : "Marcar pago", "✓", `data-toggle-card-recurring="${parts[0]}"`),
+        actionOption("Editar fixo", "✎", `data-edit-card-recurring="${parts[0]}"`),
+        actionOption("Excluir fixo", "×", `data-delete-card-recurring="${parts[0]}"`)
+      ],
+      cardPayment: [
+        actionOption("Editar pagamento", "✎", `data-edit-card-payment="${id}"`),
+        actionOption("Excluir pagamento", "×", `data-delete-card-payment="${id}"`)
+      ],
+      fixed: [
+        actionOption(parts[1] === "paid" ? "Marcar pendente" : "Marcar pago", "✓", `data-toggle-fixed="${parts[0]}"`),
+        actionOption("Editar conta", "✎", `data-edit-fixed="${parts[0]}"`),
+        actionOption("Excluir conta", "×", `data-delete-fixed="${parts[0]}"`)
+      ]
+    };
+    openItemActions(optionsByKind[kind] || []);
+    return;
+  }
+
   const deleteMap = [
     ["deleteEntry", "entries", "entry"],
     ["deleteInstallment", "installments", "installment"],
@@ -3308,8 +3371,9 @@ document.addEventListener("click", (event) => {
   ];
   for (const [datasetKey, stateKey] of deleteMap) {
     if (event.target.dataset[datasetKey]) {
+      const id = event.target.dataset[datasetKey];
+      closeModal();
       askConfirm(() => {
-        const id = event.target.dataset[datasetKey];
         if (datasetKey === "deleteCard") {
           const card = state.cards.find((item) => item.id === id);
           state.cards = state.cards.filter((item) => item.id !== id);
@@ -3331,12 +3395,14 @@ document.addEventListener("click", (event) => {
   }
 
   if (event.target.dataset.editEntry) {
+    closeModal();
     editingEntryId = event.target.dataset.editEntry;
     setActiveView("entries");
     renderEntries();
   }
 
   if (event.target.dataset.toggleFixed) {
+    closeModal();
     state.fixedBills = (state.fixedBills || []).map((item) => {
       if (item.id !== event.target.dataset.toggleFixed) return item;
       const paidMonths = new Set(item.paidMonths || []);
@@ -3354,17 +3420,18 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.editFixed) editFixedBill(event.target.dataset.editFixed);
-  if (event.target.dataset.editCard) editCard(event.target.dataset.editCard);
-  if (event.target.dataset.editInstallment) editInstallment(event.target.dataset.editInstallment);
-  if (event.target.dataset.editCardRecurring) editCardRecurring(event.target.dataset.editCardRecurring);
-  if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
+  if (event.target.dataset.editFixed) { closeModal(); editFixedBill(event.target.dataset.editFixed); }
+  if (event.target.dataset.editCard) { closeModal(); editCard(event.target.dataset.editCard); }
+  if (event.target.dataset.editInstallment) { closeModal(); editInstallment(event.target.dataset.editInstallment); }
+  if (event.target.dataset.editCardRecurring) { closeModal(); editCardRecurring(event.target.dataset.editCardRecurring); }
+  if (event.target.dataset.editAccount) { closeModal(); editAccount(event.target.dataset.editAccount); }
   if (event.target.dataset.cardDetail) {
     selectedInvoiceCard = event.target.dataset.cardDetail;
     setActiveView("cards");
     renderCards();
   }
   if (event.target.dataset.editCardPayment) {
+    closeModal();
     const item = state.cardPayments.find((payment) => payment.id === event.target.dataset.editCardPayment);
     if (item) {
       modalMode = { kind: "cardPayment", id: item.id, fields: [
@@ -3476,6 +3543,7 @@ document.addEventListener("click", (event) => {
   }
 
   if (event.target.dataset.toggleCardPart) {
+    closeModal();
     const [id, month, year] = event.target.dataset.toggleCardPart.split("|");
     state.installments = state.installments.map((item) => {
       if (item.id !== id) return item;
@@ -3494,6 +3562,7 @@ document.addEventListener("click", (event) => {
   }
 
   if (event.target.dataset.toggleCardRecurring) {
+    closeModal();
     state.cardRecurring = state.cardRecurring.map((item) => {
       if (item.id !== event.target.dataset.toggleCardRecurring) return item;
       const paidMonths = new Set(item.paidMonths || []);
