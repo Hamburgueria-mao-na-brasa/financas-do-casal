@@ -1513,8 +1513,6 @@ function renderMonthFilter() {
     yearSelect.innerHTML = years.map((year) => `<option value="${year}" ${Number(state.selectedYear) === year ? "selected" : ""}>${year}</option>`).join("");
   }
   const switcher = qs("#period-switcher");
-  const topActions = qs(".top-actions");
-  if (switcher && topActions && switcher.parentElement !== topActions) topActions.appendChild(switcher);
   if (switcher) {
     switcher.innerHTML = `
       <label class="field compact period-month">

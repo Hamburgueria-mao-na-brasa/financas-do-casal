@@ -86,6 +86,65 @@
   }
 }
 
+body.app-ready:not([data-view="dashboard"]) .top-actions::before {
+  display: none !important;
+}
+
+body.app-ready .period-switcher {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  body.app-ready:not([data-view="dashboard"]) .period-switcher {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 12px;
+    right: 112px;
+    z-index: 56;
+    display: flex !important;
+    gap: 6px;
+    align-items: center;
+    padding: 0;
+  }
+
+  body.app-ready[data-view="dashboard"] .period-switcher {
+    display: none !important;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact {
+    min-height: 44px;
+    height: 44px;
+    padding: 5px 8px;
+    border-radius: 15px;
+    color: #f2fff9;
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(183, 255, 238, .15);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .24);
+    backdrop-filter: blur(14px);
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .period-month {
+    flex: 1 1 auto;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .year-compact {
+    flex: 0 0 82px;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact span {
+    display: none;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact select {
+    min-height: 32px;
+    height: 32px;
+    color: #f2fff9;
+    font-size: 14px;
+    font-weight: 900;
+    background: transparent;
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
