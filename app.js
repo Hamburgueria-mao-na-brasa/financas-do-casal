@@ -257,9 +257,12 @@ function cardTotals(cardName) {
     ...open.filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear)),
     ...recurringOpen
   ];
+  const monthOpenTotal = total(monthOpen);
+  const paymentCredit = Math.min(monthOpenTotal, cardPaymentTotal(cardName));
+  const used = Math.max(0, total(open) + total(recurringOpen) - paymentCredit);
   return {
-    used: total(open) + total(recurringOpen),
-    month: total(monthOpen),
+    used,
+    month: monthOpenTotal,
     next: total(open.filter((part) => part.month === nextMonth && Number(part.year) === Number(nextYear))) + total(recurringNext)
   };
 }
@@ -973,7 +976,6 @@ function saveEditModal(event) {
         firstMonth,
         firstYear
       });
-      moveViewToPeriod(firstMonth, firstYear);
     }
   }
   if (data.kind === "cardRecurring") {
@@ -1462,9 +1464,22 @@ function renderMonthFilter() {
   const yearSelect = qs("#year-filter");
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 7 }, (_, index) => currentYear - 3 + index);
-  select.innerHTML = months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("");
+  if (select) select.innerHTML = months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("");
   if (yearSelect) {
     yearSelect.innerHTML = years.map((year) => `<option value="${year}" ${Number(state.selectedYear) === year ? "selected" : ""}>${year}</option>`).join("");
+  }
+  const switcher = qs("#period-switcher");
+  if (switcher) {
+    switcher.innerHTML = `
+      <label class="field compact">
+        <span>Mês</span>
+        <select data-period-month>${months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("")}</select>
+      </label>
+      <label class="field compact year-compact">
+        <span>Ano</span>
+        <select data-period-year>${years.map((year) => `<option value="${year}" ${Number(state.selectedYear) === year ? "selected" : ""}>${year}</option>`).join("")}</select>
+      </label>
+    `;
   }
 }
 
@@ -2163,7 +2178,6 @@ function addEntry(event) {
   if (editingEntryId) {
     state.entries = state.entries.map((item) => item.id === editingEntryId ? payload : item);
     editingEntryId = null;
-    moveViewToPeriod(entryDate.month, entryDate.year);
     notify("entry", `Lançamento editado: ${data.description || data.category}`);
   } else {
     state.entries.unshift(payload);
@@ -2727,6 +2741,7 @@ function cardSummary(card) {
     <div class="card-chip"></div>
     <div class="card-lines">
       <span>Limite total</span><b>${formatMoney(card.limit)}</b>
+      <span>Limite usado</span><b>${formatMoney(totals.used)}</b>
       <span>Disponível</span><b>${formatMoney(available)}</b>
       <span>Fatura do mês</span><b>${formatMoney(totals.month)}</b>
       <span>Fechamento</span><b>dia ${card.closeDay || 20}</b>
@@ -2767,7 +2782,6 @@ function addInstallment(event) {
     firstYear,
     paidMonths: []
   });
-  moveViewToPeriod(firstMonth, firstYear);
   notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
@@ -3695,13 +3709,12 @@ document.addEventListener("click", (event) => {
   }
 });
 
-qs("#month-filter").addEventListener("change", (event) => {
-  state.selectedMonth = event.target.value;
-  render();
-});
-
 document.addEventListener("change", (event) => {
-  if (event.target?.id === "year-filter") {
+  if (event.target?.id === "month-filter" || event.target?.matches("[data-period-month]")) {
+    state.selectedMonth = event.target.value;
+    render();
+  }
+  if (event.target?.id === "year-filter" || event.target?.matches("[data-period-year]")) {
     state.selectedYear = Number(event.target.value);
     render();
   }

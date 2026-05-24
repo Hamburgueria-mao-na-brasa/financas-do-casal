@@ -500,6 +500,22 @@ h2 {
   gap: 10px;
 }
 
+.period-switcher {
+  display: none;
+  align-items: end;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid rgba(183, 255, 238, .14);
+  border-radius: 18px;
+  background: rgba(10, 28, 38, .72);
+  box-shadow: var(--shadow-soft);
+}
+
+body.app-ready:not([data-view="dashboard"]) .period-switcher {
+  display: flex;
+}
+
 .cloud-panel {
   display: flex;
   align-items: center;
@@ -2905,6 +2921,14 @@ button.list-item {
 
   body.app-ready:not([data-view="dashboard"]) .shell {
     padding-top: 16px;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .period-switcher {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    margin: 0 16px 16px;
+    padding: 10px;
+    border-radius: 18px;
   }
 
   .mobile-app-brand {
