@@ -3523,6 +3523,7 @@ function navViewFor(view) {
 }
 
 function setActiveView(view) {
+  if (view === "more") renderMore();
   const navView = navViewFor(view);
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === navView));
   document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === view));
