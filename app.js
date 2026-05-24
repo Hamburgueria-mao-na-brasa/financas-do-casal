@@ -1554,9 +1554,8 @@ function ensureMoreNavigation() {
   if (tabs && !qs('[data-view="more"]', tabs)) {
     tabs.insertAdjacentHTML("beforeend", `<button class="tab tab-more" data-view="more" title="Mais">☰ <span>Mais</span></button>`);
   }
-  const shell = qs(".shell");
-  if (shell && !qs("#more")) {
-    shell.insertAdjacentHTML("beforeend", `<section class="view" id="more"></section>`);
+  if (!qs("#more")) {
+    qs(".shell").insertAdjacentHTML("beforeend", `<section class="view" id="more"></section>`);
   }
 }
 
@@ -2497,8 +2496,8 @@ function renderFixedBills() {
       </div>
     </section>
     <div class="mode-picker fixed-tabs">
-      <button class="${fixedTab === "cash" ? "active" : ""}" type="button" data-fixed-tab="cash">Contas fora do cartão</button>
-      <button class="${fixedTab === "card" ? "active" : ""}" type="button" data-fixed-tab="card">Fixos no cartão</button>
+      <button class="${fixedTab === "cash" ? "active" : ""}" type="button" data-fixed-tab="cash">Fora do cartão</button>
+      <button class="${fixedTab === "card" ? "active" : ""}" type="button" data-fixed-tab="card">No cartão</button>
     </div>
     <div class="fixed-tab-panel ${fixedTab === "cash" ? "active" : ""}">
     <form class="settings-form" id="fixed-form">
@@ -2520,7 +2519,7 @@ function renderFixedBills() {
     </div>
     <div class="fixed-tab-panel ${fixedTab === "card" ? "active" : ""}">
     <form class="settings-form" id="card-recurring-form">
-      <div class="span-3 form-heading"><span>▣</span><div><h2>Novo fixo no cartão</h2><small>Para internet cobrada no cartão, streaming, apps e assinaturas mensais.</small></div></div>
+      <div class="span-3 form-heading"><span>▣</span><div><h2>Nova assinatura no cartão</h2><small>Para internet no cartão, streaming, apps e assinaturas mensais.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a cobrança cai todo mês.")}
       ${input("description", "Nome", "text", "", "", "Ex: internet, Netflix, Spotify, academia.")}
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria dessa cobrança.")}
@@ -2529,7 +2528,7 @@ function renderFixedBills() {
       <button class="primary form-submit" type="submit">Salvar fixo no cartão</button>
     </form>
     <div class="panel soft-panel">
-      <div class="section-title"><span>↻</span><div><h2>Fixos no cartão</h2><small>Entram na fatura do mês, diminuem o limite e aparecem no extrato do cartão.</small></div></div>
+      <div class="section-title"><span>↻</span><div><h2>Assinaturas no cartão</h2><small>Entram na fatura do mês e podem ser marcadas como pagas.</small></div></div>
       <div class="wallet-list">
         ${state.cardRecurring.length ? state.cardRecurring.map(cardRecurringRow).join("") : emptyHtml()}
       </div>
@@ -2660,7 +2659,6 @@ function renderCards() {
   const cardAvailable = cardLimit - cardUsed;
   const currentCard = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
   const otherCards = state.cards.filter((item) => !sameCard(item.name, currentCard?.name));
-  const currentSummary = currentCard ? cardStatementSummary(currentCard) : null;
   qs("#cards").innerHTML = `
     <section class="feature-hero cards-hero">
       <div>
@@ -2674,16 +2672,8 @@ function renderCards() {
         <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
       </div>
     </section>
-    <div class="card-command-bar panel">
-      <label class="field statement-card-select">
-        <span>Cartão selecionado</span>
-        <select id="invoice-card-detail-select">
-          ${state.cards.length ? state.cards.map((item) => `<option ${currentCard && sameCard(item.name, currentCard.name) ? "selected" : ""}>${item.name}</option>`).join("") : `<option>Nenhum cartão cadastrado</option>`}
-        </select>
-      </label>
-      <button class="ghost card-setup-toggle" type="button" data-toggle-card-setup>${cardSetupOpen ? "Ocultar cadastro" : "Adicionar cartão"}</button>
-    </div>
-    <div class="cards-layout ${cardSetupOpen ? "" : "invoice-only"}">
+    <button class="ghost card-setup-toggle" type="button" data-toggle-card-setup>${cardSetupOpen ? "Ocultar cadastro" : "Adicionar cartão"}</button>
+    <div class="cards-layout">
       ${cardSetupOpen ? `<form class="entry-form guided-form card-setup-card" id="card-settings-form">
         <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Limite, fechamento e vencimento.</small></div></div>
         ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
@@ -2695,15 +2685,21 @@ function renderCards() {
         <button class="primary" type="submit">Salvar cartão</button>
       </form>` : ""}
       <div class="panel soft-panel invoice-focus">
-        <div class="section-title"><span>▣</span><div><h2>${currentCard ? `Fatura ${currentCard.name}` : "Fatura atual"}</h2><small>${currentCard ? `${state.selectedMonth}/${state.selectedYear} · aberto ${formatMoney(currentSummary.open)}` : "Cadastre um cartão para começar."}</small></div></div>
-        ${currentCard ? selectedCardOverview(currentCard) : emptyHtml()}
+        <div class="section-title"><span>▣</span><div><h2>Fatura atual</h2><small>${currentCard ? `${currentCard.name} · ${state.selectedMonth}/${state.selectedYear}` : "Cadastre um cartão para começar."}</small></div></div>
+        ${currentCard ? cardInvoiceRow(currentCard) : emptyHtml()}
+      </div>
+    </div>
+    <div class="panel soft-panel">
+      <div class="section-title"><span>▣</span><div><h2>Meus cartões</h2><small>Limite, vencimento, fechamento e fatura atual.</small></div></div>
+      <div class="grid-3 card-grid">
+        ${state.cards.map(cardSummary).join("") || emptyHtml()}
       </div>
     </div>
     ${otherCards.length ? `
       <div class="panel soft-panel">
-        <div class="section-title"><span>▣</span><div><h2>Outros cartões</h2><small>Toque em detalhes para abrir a fatura.</small></div></div>
-        <div class="grid-3 card-grid compact-card-grid">
-          ${otherCards.map(cardSummary).join("")}
+        <div class="section-title"><span>☷</span><div><h2>Outras faturas</h2><small>Os demais cartões do mês.</small></div></div>
+        <div class="list">
+          ${otherCards.map(cardInvoiceRow).join("")}
         </div>
       </div>
     ` : ""}
@@ -2718,28 +2714,6 @@ function renderCards() {
   });
 }
 
-function selectedCardOverview(card) {
-  const totals = cardTotals(card.name);
-  const summary = cardStatementSummary(card);
-  const available = Number(card.limit || 0) - totals.used;
-  return `
-    <div class="selected-card-overview">
-      ${cardSummary(card)}
-      <div class="invoice-summary-panel">
-        <div class="invoice-numbers">
-          <div><span>Fatura total</span><strong>${formatMoney(summary.invoiceTotal)}</strong></div>
-          <div><span>Pago</span><strong>${formatMoney(summary.paidTotal)}</strong></div>
-          <div><span>Em aberto</span><strong>${formatMoney(summary.open)}</strong></div>
-          <div><span>Limite livre</span><strong>${formatMoney(available)}</strong></div>
-        </div>
-        <div class="card-actions">
-          ${summary.open > 0 ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar parcial</button><button class="tiny ghost" data-pay-card-month="${card.name}">Quitar fatura</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function cardDetailHtml() {
   const card = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
   if (!card) return "";
@@ -2749,6 +2723,12 @@ function cardDetailHtml() {
   return `
     <div class="panel soft-panel card-detail-panel" id="card-detail-panel">
       <div class="section-title"><span>▣</span><div><h2>Compras e pagamentos: ${card.name}</h2><small>Total ${formatMoney(summary.invoiceTotal)} · pago ${formatMoney(summary.paidTotal)} · aberto ${formatMoney(summary.open)}</small></div></div>
+      <label class="field statement-card-select">
+        <span>Ver cartão</span>
+        <select id="invoice-card-detail-select">
+          ${state.cards.map((item) => `<option ${sameCard(item.name, card.name) ? "selected" : ""}>${item.name}</option>`).join("")}
+        </select>
+      </label>
       <div class="grid-2">
         <div class="list">
           <h2>Itens da fatura</h2>
@@ -2848,7 +2828,7 @@ function cardSummary(card) {
   const totals = cardTotals(card.name);
   const available = Number(card.limit || 0) - totals.used;
   const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
-  return `<article class="credit-card ${card.color || "Azul"} ${selectedInvoiceCard && sameCard(card.name, selectedInvoiceCard) ? "selected" : ""}">
+  return `<article class="credit-card ${card.color || "Azul"}">
     <div>
       <span>Cartão de crédito${card.owner ? ` · ${card.owner}` : ""}</span>
       <strong>${card.name}</strong>
@@ -3129,20 +3109,24 @@ function addGoal(event) {
 }
 
 function renderMore() {
-  ensureMoreNavigation();
-  const moreView = qs("#more");
-  if (!moreView) return;
   const summary = currentSummary();
   const closed = isMonthClosed();
-  const items = [
-    { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
-    { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
-    { view: "accounts", icon: "≋", title: "Contas e dinheiro", note: `${state.accounts.length} contas · organize onde o dinheiro fica`, tone: "cyan" },
-    { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
-    { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" },
-    { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar", tone: "violet" }
+  const sections = [
+    ["Acompanhar", [
+      { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
+      { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
+      { view: "accounts", icon: "≋", title: "Carteira", note: `${state.accounts.length} contas · onde o dinheiro fica`, tone: "cyan" }
+    ]],
+    ["Planejar", [
+      { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
+      { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" }
+    ]],
+    ["Sistema", [
+      { install: true, icon: "⇩", title: "Instalar no celular", note: "Atalho para Android e iPhone", tone: "cyan" },
+      { view: "settings", icon: "⚙", title: "Configurações", note: "Perfil, convite, backup e categorias", tone: "violet" }
+    ]]
   ];
-  moreView.innerHTML = `
+  qs("#more").innerHTML = `
     <section class="more-hero">
       <div>
         <span>Menu do casal</span>
@@ -3154,29 +3138,37 @@ function renderMore() {
         <strong>${formatMoney(summary.balance)}</strong>
       </div>
     </section>
-    <div class="more-grid">
-      ${items.map((item) => `
-        <button class="more-card ${item.tone}" type="button" data-view="${item.view}">
-          <b>${item.icon}</b>
-          <span><strong>${item.title}</strong><small>${item.note}</small></span>
-        </button>
+    <div class="more-sections">
+      ${sections.map(([title, items]) => `
+        <section class="more-section">
+          <h2>${title}</h2>
+          <div class="more-grid">
+            ${items.map((item) => `
+              <button class="more-card ${item.tone}" type="button" ${item.install ? "data-install-help" : `data-view="${item.view}"`}>
+                <b>${item.icon}</b>
+                <span><strong>${item.title}</strong><small>${item.note}</small></span>
+              </button>
+            `).join("")}
+          </div>
+        </section>
       `).join("")}
-      <button class="more-card cyan" type="button" data-install-help>
-        <b>⇩</b>
-        <span><strong>Instalar no celular</strong><small>Atalho para Android e iPhone</small></span>
-      </button>
+      <section class="more-section account-actions">
+        <h2>Conta</h2>
+        <div class="more-grid">
+          <button class="more-card ${closed ? "green" : "gold"}" type="button" id="toggle-month-closed">
+            <b>${closed ? "✓" : "□"}</b>
+            <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
+          </button>
+          <button class="more-card logout-card" type="button" id="logout-more">
+            <b>↩</b>
+            <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
+          </button>
+        </div>
+      </section>
     </div>
-    <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
-      <b>↩</b>
-      <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
-    </button>
-    <button class="more-card ${closed ? "green" : "gold"}" type="button" id="toggle-month-closed">
-      <b>${closed ? "✓" : "□"}</b>
-      <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
-    </button>
   `;
-  qs("#logout-more", moreView)?.addEventListener("click", signOut);
-  qs("#toggle-month-closed", moreView)?.addEventListener("click", () => {
+  qs("#logout-more").addEventListener("click", signOut);
+  qs("#toggle-month-closed").addEventListener("click", () => {
     const key = periodKey();
     const closedMonths = new Set(state.closedMonths || []);
     if (closedMonths.has(key)) closedMonths.delete(key);
@@ -3523,7 +3515,6 @@ function navViewFor(view) {
 }
 
 function setActiveView(view) {
-  if (view === "more") renderMore();
   const navView = navViewFor(view);
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === navView));
   document.querySelectorAll(".view").forEach((item) => item.classList.toggle("active", item.id === view));
