@@ -3111,13 +3111,20 @@ function addGoal(event) {
 function renderMore() {
   const summary = currentSummary();
   const closed = isMonthClosed();
-  const items = [
-    { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
-    { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
-    { view: "accounts", icon: "≋", title: "Contas e dinheiro", note: `${state.accounts.length} contas · organize onde o dinheiro fica`, tone: "cyan" },
-    { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
-    { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" },
-    { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar", tone: "violet" }
+  const sections = [
+    ["Acompanhar", [
+      { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
+      { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
+      { view: "accounts", icon: "≋", title: "Carteira", note: `${state.accounts.length} contas · onde o dinheiro fica`, tone: "cyan" }
+    ]],
+    ["Planejar", [
+      { view: "goals", icon: "◇", title: "Metas", note: `${state.goals.length} objetivos · guardado ${formatMoney(summary.goalsSaved)}`, tone: "pink" },
+      { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" }
+    ]],
+    ["Sistema", [
+      { install: true, icon: "⇩", title: "Instalar no celular", note: "Atalho para Android e iPhone", tone: "cyan" },
+      { view: "settings", icon: "⚙", title: "Configurações", note: "Perfil, convite, backup e categorias", tone: "violet" }
+    ]]
   ];
   qs("#more").innerHTML = `
     <section class="more-hero">
@@ -3131,26 +3138,34 @@ function renderMore() {
         <strong>${formatMoney(summary.balance)}</strong>
       </div>
     </section>
-    <div class="more-grid">
-      ${items.map((item) => `
-        <button class="more-card ${item.tone}" type="button" data-view="${item.view}">
-          <b>${item.icon}</b>
-          <span><strong>${item.title}</strong><small>${item.note}</small></span>
-        </button>
+    <div class="more-sections">
+      ${sections.map(([title, items]) => `
+        <section class="more-section">
+          <h2>${title}</h2>
+          <div class="more-grid">
+            ${items.map((item) => `
+              <button class="more-card ${item.tone}" type="button" ${item.install ? "data-install-help" : `data-view="${item.view}"`}>
+                <b>${item.icon}</b>
+                <span><strong>${item.title}</strong><small>${item.note}</small></span>
+              </button>
+            `).join("")}
+          </div>
+        </section>
       `).join("")}
-      <button class="more-card cyan" type="button" data-install-help>
-        <b>⇩</b>
-        <span><strong>Instalar no celular</strong><small>Atalho para Android e iPhone</small></span>
-      </button>
+      <section class="more-section account-actions">
+        <h2>Conta</h2>
+        <div class="more-grid">
+          <button class="more-card ${closed ? "green" : "gold"}" type="button" id="toggle-month-closed">
+            <b>${closed ? "✓" : "□"}</b>
+            <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
+          </button>
+          <button class="more-card logout-card" type="button" id="logout-more">
+            <b>↩</b>
+            <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
+          </button>
+        </div>
+      </section>
     </div>
-    <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
-      <b>↩</b>
-      <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
-    </button>
-    <button class="more-card ${closed ? "green" : "gold"}" type="button" id="toggle-month-closed">
-      <b>${closed ? "✓" : "□"}</b>
-      <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
-    </button>
   `;
   qs("#logout-more").addEventListener("click", signOut);
   qs("#toggle-month-closed").addEventListener("click", () => {

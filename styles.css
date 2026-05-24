@@ -1846,6 +1846,27 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   gap: 12px;
 }
 
+.more-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.more-section {
+  display: grid;
+  gap: 10px;
+}
+
+.more-section h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.account-actions {
+  padding-top: 4px;
+}
+
 .more-hero {
   min-height: 170px;
   display: grid;
@@ -3423,6 +3444,11 @@ button.list-item {
   }
 
   .more-card small {
+    color: #b9d7d1;
+  }
+
+  .more-section h2 {
+    margin-left: 28px;
     color: #b9d7d1;
   }
 
