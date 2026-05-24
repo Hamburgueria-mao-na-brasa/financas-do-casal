@@ -1444,6 +1444,7 @@ function renderDashboard() {
   const mood = dashboardMood(summary.balance, summary.salaryTotal);
 
   qs("#dashboard").innerHTML = `
+    ${isMonthClosed() ? `<div class="panel closed-month-banner"><strong>Mês fechado</strong><span>Este mês está marcado como conferido. Você ainda pode editar, mas vale revisar antes.</span></div>` : ""}
     <section class="bank-home">
       <div class="balance-card">
         <div>
@@ -2422,13 +2423,18 @@ function renderAgenda() {
     priority: "normal"
   }));
   const items = [...fixedItems, ...cardItems, ...goalItems].sort((a, b) => a.date - b.date);
+  const groups = [
+    ["Vencidas", items.filter((item) => item.priority === "overdue")],
+    ["Vencem hoje", items.filter((item) => item.priority === "today")],
+    ["Próximas", items.filter((item) => item.priority !== "overdue" && item.priority !== "today")]
+  ];
   qs("#agenda").innerHTML = `
     <div class="panel helper-panel">
       <h2>Agenda financeira</h2>
       <p>Uma linha do tempo com contas, faturas e metas para vocês não perderem vencimentos.</p>
     </div>
     <div class="panel agenda-list">
-      ${items.length ? items.map(agendaItem).join("") : emptyHtml()}
+      ${items.length ? groups.map(([title, groupItems]) => groupItems.length ? `<section class="agenda-group"><h2>${title}</h2>${groupItems.map(agendaItem).join("")}</section>` : "").join("") : emptyHtml()}
     </div>
   `;
 }
@@ -2621,10 +2627,11 @@ function cardInvoiceRow(card) {
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Fecha dia ${card.closeDay || 20} · vence dia ${card.dueDay || 10} · Total ${formatMoney(totalMonth)} · Aberta ${formatMoney(openAfterPayments)} · Pago parcial ${formatMoney(invoicePayments)} · Itens pagos ${formatMoney(paidTotal)} · Próxima ${formatMoney(totals.next)} (${nextMonth})</span>
+          <span>Fatura atual ${formatMoney(totalMonth)} · pago ${formatMoney(invoicePayments + paidTotal)} · falta ${formatMoney(openAfterPayments)} · vence dia ${card.dueDay || 10}</span>
         </div>
         <span class="card-actions">
-          ${openItems.length ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar parcial</button> <button class="tiny ghost" data-pay-card-month="${card.name}">Quitar fatura</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir fatura</button>`}
+          <button class="tiny ghost" data-card-detail="${card.name}">Detalhes</button>
+          ${openItems.length ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar fatura</button> <button class="tiny ghost" data-pay-card-month="${card.name}">Quitar</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir</button>`}
         </span>
       </div>
       <div class="invoice-items">
@@ -2938,6 +2945,7 @@ function addGoal(event) {
 
 function renderMore() {
   const summary = currentSummary();
+  const closed = isMonthClosed();
   const items = [
     { view: "agenda", icon: "◌", title: "Agenda", note: "Vencimentos, faturas e metas com data", tone: "cyan" },
     { view: "cards", icon: "▣", title: "Cartões", note: `${state.cards.length} cadastrados · fatura ${formatMoney(summary.cardMonth)}`, tone: "blue" },
@@ -2970,8 +2978,21 @@ function renderMore() {
       <b>↩</b>
       <span><strong>Sair da conta</strong><small>Fechar sua sessão neste aparelho</small></span>
     </button>
+    <button class="more-card ${closed ? "green" : "gold"}" type="button" id="toggle-month-closed">
+      <b>${closed ? "✓" : "□"}</b>
+      <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
+    </button>
   `;
   qs("#logout-more").addEventListener("click", signOut);
+  qs("#toggle-month-closed").addEventListener("click", () => {
+    const key = periodKey();
+    const closedMonths = new Set(state.closedMonths || []);
+    if (closedMonths.has(key)) closedMonths.delete(key);
+    else closedMonths.add(key);
+    state.closedMonths = [...closedMonths];
+    notify("sync", closedMonths.has(key) ? "Mês fechado" : "Mês reaberto");
+    commitState();
+  });
 }
 
 function renderSettings() {
@@ -3343,9 +3364,10 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  if (event.target.dataset.optionsKind) {
-    const kind = event.target.dataset.optionsKind;
-    const id = event.target.dataset.optionsId;
+  const optionTrigger = event.target.closest("[data-options-kind]");
+  if (optionTrigger) {
+    const kind = optionTrigger.dataset.optionsKind;
+    const id = optionTrigger.dataset.optionsId;
     const parts = String(id || "").split("|");
     const optionsByKind = {
       entry: [
@@ -3377,18 +3399,19 @@ document.addEventListener("click", (event) => {
   }
 
   const deleteMap = [
-    ["deleteEntry", "entries", "entry"],
-    ["deleteInstallment", "installments", "installment"],
-    ["deleteCardRecurring", "cardRecurring", "cardRecurring"],
-    ["deleteCardPayment", "cardPayments", "cardPayment"],
-    ["deleteAccount", "accounts", "account"],
-    ["deleteCard", "cards", "card"],
-    ["deleteFixed", "fixedBills", "fixed"],
-    ["deleteGoal", "goals", "goal"]
+    ["deleteEntry", "data-delete-entry", "entries", "entry"],
+    ["deleteInstallment", "data-delete-installment", "installments", "installment"],
+    ["deleteCardRecurring", "data-delete-card-recurring", "cardRecurring", "cardRecurring"],
+    ["deleteCardPayment", "data-delete-card-payment", "cardPayments", "cardPayment"],
+    ["deleteAccount", "data-delete-account", "accounts", "account"],
+    ["deleteCard", "data-delete-card", "cards", "card"],
+    ["deleteFixed", "data-delete-fixed", "fixedBills", "fixed"],
+    ["deleteGoal", "data-delete-goal", "goals", "goal"]
   ];
-  for (const [datasetKey, stateKey] of deleteMap) {
-    if (event.target.dataset[datasetKey]) {
-      const id = event.target.dataset[datasetKey];
+  for (const [datasetKey, attrName, stateKey] of deleteMap) {
+    const deleteButton = event.target.closest(`[${attrName}]`);
+    if (deleteButton) {
+      const id = deleteButton.dataset[datasetKey];
       closeModal();
       askConfirm(() => {
         if (datasetKey === "deleteCard") {
@@ -3411,17 +3434,19 @@ document.addEventListener("click", (event) => {
     }
   }
 
-  if (event.target.dataset.editEntry) {
+  const editEntryButton = event.target.closest("[data-edit-entry]");
+  if (editEntryButton) {
     closeModal();
-    editingEntryId = event.target.dataset.editEntry;
+    editingEntryId = editEntryButton.dataset.editEntry;
     setActiveView("entries");
     renderEntries();
   }
 
-  if (event.target.dataset.toggleFixed) {
+  const toggleFixedButton = event.target.closest("[data-toggle-fixed]");
+  if (toggleFixedButton) {
     closeModal();
     state.fixedBills = (state.fixedBills || []).map((item) => {
-      if (item.id !== event.target.dataset.toggleFixed) return item;
+      if (item.id !== toggleFixedButton.dataset.toggleFixed) return item;
       const paidMonths = new Set(item.paidMonths || []);
       const key = periodKey();
       if (paidMonths.has(key) || paidMonths.has(state.selectedMonth)) {
@@ -3437,19 +3462,26 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.editFixed) { closeModal(); editFixedBill(event.target.dataset.editFixed); }
-  if (event.target.dataset.editCard) { closeModal(); editCard(event.target.dataset.editCard); }
-  if (event.target.dataset.editInstallment) { closeModal(); editInstallment(event.target.dataset.editInstallment); }
-  if (event.target.dataset.editCardRecurring) { closeModal(); editCardRecurring(event.target.dataset.editCardRecurring); }
-  if (event.target.dataset.editAccount) { closeModal(); editAccount(event.target.dataset.editAccount); }
-  if (event.target.dataset.cardDetail) {
-    selectedInvoiceCard = event.target.dataset.cardDetail;
+  const editFixedButton = event.target.closest("[data-edit-fixed]");
+  const editCardButton = event.target.closest("[data-edit-card]");
+  const editInstallmentButton = event.target.closest("[data-edit-installment]");
+  const editCardRecurringButton = event.target.closest("[data-edit-card-recurring]");
+  const editAccountButton = event.target.closest("[data-edit-account]");
+  if (editFixedButton) { closeModal(); editFixedBill(editFixedButton.dataset.editFixed); }
+  if (editCardButton) { closeModal(); editCard(editCardButton.dataset.editCard); }
+  if (editInstallmentButton) { closeModal(); editInstallment(editInstallmentButton.dataset.editInstallment); }
+  if (editCardRecurringButton) { closeModal(); editCardRecurring(editCardRecurringButton.dataset.editCardRecurring); }
+  if (editAccountButton) { closeModal(); editAccount(editAccountButton.dataset.editAccount); }
+  const cardDetailButton = event.target.closest("[data-card-detail]");
+  if (cardDetailButton) {
+    selectedInvoiceCard = cardDetailButton.dataset.cardDetail;
     setActiveView("cards");
     renderCards();
   }
-  if (event.target.dataset.editCardPayment) {
+  const editCardPaymentButton = event.target.closest("[data-edit-card-payment]");
+  if (editCardPaymentButton) {
     closeModal();
-    const item = state.cardPayments.find((payment) => payment.id === event.target.dataset.editCardPayment);
+    const item = state.cardPayments.find((payment) => payment.id === editCardPaymentButton.dataset.editCardPayment);
     if (item) {
       modalMode = { kind: "cardPayment", id: item.id, fields: [
         { name: "description", label: "Descrição", value: item.description },
@@ -3460,16 +3492,18 @@ document.addEventListener("click", (event) => {
     }
   }
 
-  if (event.target.dataset.editCategory) {
-    const [kind, oldName] = event.target.dataset.editCategory.split("|");
+  const editCategoryButton = event.target.closest("[data-edit-category]");
+  if (editCategoryButton) {
+    const [kind, oldName] = editCategoryButton.dataset.editCategory.split("|");
     modalMode = { kind: "category", id: oldName, extra: { categoryKind: kind, oldName }, fields: [
       { name: "name", label: "Nome da categoria", value: oldName }
     ] };
     renderModal();
   }
 
-  if (event.target.dataset.deleteCategory) {
-    const [kind, oldName] = event.target.dataset.deleteCategory.split("|");
+  const deleteCategoryButton = event.target.closest("[data-delete-category]");
+  if (deleteCategoryButton) {
+    const [kind, oldName] = deleteCategoryButton.dataset.deleteCategory.split("|");
     askConfirm(() => {
       const key = kind === "Receita" ? "categoriesIncome" : "categoriesExpense";
       state[key] = state[key].filter((item) => item !== oldName);
@@ -3478,8 +3512,9 @@ document.addEventListener("click", (event) => {
     });
   }
 
-  if (event.target.dataset.addGoal) {
-    const goal = state.goals.find((item) => item.id === event.target.dataset.addGoal);
+  const addGoalButton = event.target.closest("[data-add-goal]");
+  if (addGoalButton) {
+    const goal = state.goals.find((item) => item.id === addGoalButton.dataset.addGoal);
     if (!goal) return;
     modalMode = { kind: "goalAdd", id: goal.id, fields: [
       { name: "value", label: "Valor para adicionar", type: "number", step: "0.01", value: 0 }
@@ -3487,8 +3522,9 @@ document.addEventListener("click", (event) => {
     renderModal();
   }
 
-  if (event.target.dataset.editGoal) {
-    const goal = state.goals.find((item) => item.id === event.target.dataset.editGoal);
+  const editGoalButton = event.target.closest("[data-edit-goal]");
+  if (editGoalButton) {
+    const goal = state.goals.find((item) => item.id === editGoalButton.dataset.editGoal);
     if (!goal) return;
     modalMode = { kind: "goal", id: goal.id, fields: [
       { name: "title", label: "Nome", value: goal.title },
@@ -3516,8 +3552,9 @@ document.addEventListener("click", (event) => {
     passwordToggle.textContent = show ? "Ocultar" : "Ver";
   }
 
-  if (event.target.dataset.payCardMonth) {
-    const cardName = event.target.dataset.payCardMonth;
+  const payCardMonthButton = event.target.closest("[data-pay-card-month]");
+  if (payCardMonthButton) {
+    const cardName = payCardMonthButton.dataset.payCardMonth;
     const openValue = Math.max(0, cardTotals(cardName).month - cardPaymentTotal(cardName));
     if (openValue > 0) addCardPayment(cardName, openValue, "Quitação da fatura");
     state.installments = state.installments.map((item) => {
@@ -3531,8 +3568,9 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.partialCardPayment) {
-    const cardName = event.target.dataset.partialCardPayment;
+  const partialCardPaymentButton = event.target.closest("[data-partial-card-payment]");
+  if (partialCardPaymentButton) {
+    const cardName = partialCardPaymentButton.dataset.partialCardPayment;
     const openValue = Math.max(0, cardTotals(cardName).month - cardPaymentTotal(cardName));
     const typed = prompt(`Quanto foi pago da fatura ${cardName}? Valor aberto: ${formatMoney(openValue)}`, openValue ? String(openValue.toFixed(2)) : "");
     if (typed === null) return;
@@ -3546,8 +3584,9 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.reopenCardMonth) {
-    const cardName = event.target.dataset.reopenCardMonth;
+  const reopenCardMonthButton = event.target.closest("[data-reopen-card-month]");
+  if (reopenCardMonthButton) {
+    const cardName = reopenCardMonthButton.dataset.reopenCardMonth;
     state.installments = state.installments.map((item) => {
       if (!sameCard(item.card, cardName)) return item;
       const schedule = getInstallmentSchedule(item);
@@ -3559,9 +3598,10 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.toggleCardPart) {
+  const toggleCardPartButton = event.target.closest("[data-toggle-card-part]");
+  if (toggleCardPartButton) {
     closeModal();
-    const [id, month, year] = event.target.dataset.toggleCardPart.split("|");
+    const [id, month, year] = toggleCardPartButton.dataset.toggleCardPart.split("|");
     state.installments = state.installments.map((item) => {
       if (item.id !== id) return item;
       const paidMonths = new Set(item.paidMonths || []);
@@ -3578,10 +3618,11 @@ document.addEventListener("click", (event) => {
     commitState();
   }
 
-  if (event.target.dataset.toggleCardRecurring) {
+  const toggleCardRecurringButton = event.target.closest("[data-toggle-card-recurring]");
+  if (toggleCardRecurringButton) {
     closeModal();
     state.cardRecurring = state.cardRecurring.map((item) => {
-      if (item.id !== event.target.dataset.toggleCardRecurring) return item;
+      if (item.id !== toggleCardRecurringButton.dataset.toggleCardRecurring) return item;
       const paidMonths = new Set(item.paidMonths || []);
       const key = periodKey();
       if (paidMonths.has(key) || paidMonths.has(state.selectedMonth)) {

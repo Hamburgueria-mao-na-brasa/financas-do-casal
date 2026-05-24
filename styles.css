@@ -2578,6 +2578,28 @@ button.list-item {
 .dashboard-action.warn { border-left: 5px solid var(--gold); }
 .dashboard-action.bad { border-left: 5px solid var(--red); }
 
+.closed-month-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border-color: rgba(255, 176, 32, .35);
+  background: rgba(255, 176, 32, .12);
+}
+
+.agenda-group {
+  display: grid;
+  gap: 10px;
+}
+
+.agenda-group + .agenda-group {
+  margin-top: 18px;
+}
+
+.compact-filter {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .dashboard-priority .list {
   gap: 10px;
 }
