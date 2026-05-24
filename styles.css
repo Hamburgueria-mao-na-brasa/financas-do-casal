@@ -86,6 +86,190 @@
   }
 }
 
+/* Rebuild 1: camada limpa para o app funcional */
+body.app-ready {
+  color: #f6f9ff;
+  background:
+    radial-gradient(circle at 82% 6%, rgba(19, 216, 255, .18), transparent 28%),
+    radial-gradient(circle at 10% 20%, rgba(123, 92, 255, .18), transparent 28%),
+    linear-gradient(180deg, #050b18 0%, #071225 46%, #0b1022 100%);
+}
+
+body.app-ready .period-switcher {
+  display: none !important;
+}
+
+body.app-ready .view.active {
+  display: grid;
+  gap: 18px;
+}
+
+body.app-ready .panel,
+body.app-ready .entry-form,
+body.app-ready .credit-card,
+body.app-ready .metric,
+body.app-ready .list-item,
+body.app-ready .more-card {
+  color: #f6f9ff;
+  background: rgba(17, 27, 52, .92);
+  border: 1px solid rgba(210, 226, 255, .16);
+  border-radius: 22px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .24);
+}
+
+body.app-ready .entry-form,
+body.app-ready .guided-form,
+body.app-ready .entries-split {
+  position: relative;
+  z-index: 2;
+}
+
+body.app-ready .field,
+body.app-ready .field input,
+body.app-ready .field select,
+body.app-ready .field textarea {
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+body.app-ready .field input,
+body.app-ready .field select,
+body.app-ready .field textarea,
+body.app-ready .password-wrap {
+  min-height: 52px;
+  color: #f6f9ff;
+  background: rgba(255, 255, 255, .075);
+  border: 1px solid rgba(210, 226, 255, .18);
+  border-radius: 16px;
+}
+
+body.app-ready .field input:focus,
+body.app-ready .field select:focus,
+body.app-ready .field textarea:focus {
+  outline: none;
+  background: rgba(255, 255, 255, .11);
+  border-color: #13d8ff;
+  box-shadow: 0 0 0 4px rgba(19, 216, 255, .16);
+}
+
+body.app-ready .primary,
+body.app-ready .mode-picker button.active {
+  color: #061225;
+  background: linear-gradient(135deg, #13d8ff 0%, #2563ff 54%, #7b5cff 100%);
+  box-shadow: 0 16px 34px rgba(37, 99, 255, .28);
+}
+
+body.app-ready .ghost {
+  color: #f6f9ff;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(210, 226, 255, .16);
+}
+
+body.app-ready .danger,
+body.app-ready .tiny.danger {
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff5a47, #ff8a3d);
+}
+
+.clean-home {
+  display: grid;
+  gap: 16px;
+}
+
+.mini-couple {
+  min-width: 118px;
+  display: grid;
+  justify-items: center;
+  align-self: center;
+  gap: 4px;
+  color: #061225;
+}
+
+.mini-couple b {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  margin: 0 -4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffe88a, #ffbd2f);
+}
+
+.mini-couple small {
+  color: rgba(255, 255, 255, .8);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.mini-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.app-toast {
+  color: #f6f9ff;
+  background: rgba(17, 27, 52, .96);
+  border-color: rgba(210, 226, 255, .16);
+}
+
+@media (max-width: 720px) {
+  body.app-ready:not([data-view="dashboard"]) .topbar {
+    display: none;
+  }
+
+  body.app-ready:not([data-view="dashboard"]) .shell {
+    padding-top: 16px;
+  }
+
+  body.app-ready .feature-hero,
+  body.app-ready .entry-form,
+  body.app-ready .panel,
+  body.app-ready .card-grid,
+  body.app-ready .summary-grid,
+  body.app-ready .more-grid {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  body.app-ready .entry-form,
+  body.app-ready .guided-form,
+  body.app-ready .entries-split,
+  body.app-ready .summary-grid,
+  body.app-ready .card-grid,
+  .mini-form {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-ready .span-2,
+  body.app-ready .span-3 {
+    grid-column: auto;
+  }
+
+  body.app-ready .list-item {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  body.app-ready .card-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  body.app-ready .card-actions button {
+    flex: 1;
+  }
+}
+
 body.app-ready:not([data-view="dashboard"]) .top-actions::before {
   display: none !important;
 }
@@ -116,25 +300,22 @@ body.app-ready .period-switcher {
 .field textarea {
   z-index: 3;
   pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button,
+select,
+input,
+textarea {
+  touch-action: manipulation;
 }
 
 @media (max-width: 720px) {
   body.app-ready:not([data-view="dashboard"]) .period-switcher {
-    position: fixed;
-    top: calc(12px + env(safe-area-inset-top));
-    left: 12px;
-    right: 112px;
-    z-index: 56;
-    display: flex !important;
-    gap: 6px;
-    align-items: center;
-    padding: 0;
-    pointer-events: none;
-  }
-
-  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact,
-  body.app-ready:not([data-view="dashboard"]) .period-switcher .field.compact select {
-    pointer-events: auto;
+    display: none !important;
+    pointer-events: none !important;
   }
 
   body.app-ready[data-view="dashboard"] .period-switcher {
@@ -3238,7 +3419,7 @@ button.list-item {
   }
 
   body.app-ready:not([data-view="dashboard"]) .shell {
-    padding-top: 76px;
+    padding-top: 16px;
   }
 
   .mobile-app-brand {
