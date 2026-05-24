@@ -58,6 +58,7 @@ let selectedInvoiceCard = "";
 let statementFiltersOpen = false;
 let fixedTab = "cash";
 let cardSetupOpen = false;
+let categoriesPanelOpen = false;
 let confirmAction = null;
 let currentActionOptions = [];
 let toastTimer = null;
@@ -3219,23 +3220,32 @@ function renderSettings() {
       ${input("salaryDayTwo", "Dia que cai", "number", state.profile.salaryDayTwo || 5, "1", "O salário só entra no saldo depois desse dia.")}
       <button class="primary form-submit" type="submit">Salvar perfil</button>
     </form>
-    <div class="grid-2">
-      <div class="panel">
-        <h2>Categorias de receitas</h2>
-        <div class="list">${state.categoriesIncome.map((item) => categoryRow(item, "Receita")).join("")}</div>
-      </div>
-      <div class="panel">
-        <h2>Categorias de despesas</h2>
-        <div class="list">${state.categoriesExpense.map((item) => categoryRow(item, "Despesa")).join("")}</div>
-      </div>
-    </div>
     <div class="settings-stack">
-      <form class="settings-form" id="category-form">
-        <div class="span-3"><h2>Nova categoria</h2></div>
-        ${select("kind", "Tipo", ["Receita", "Despesa"])}
-        ${input("name", "Nova categoria", "text", "")}
-        <button class="primary" type="submit">Adicionar</button>
-      </form>
+      <div class="panel settings-summary-panel">
+        <div>
+          <h2>Categorias</h2>
+          <p class="mini-status">Receitas e despesas ficam escondidas para não poluir esta tela.</p>
+        </div>
+        <button class="ghost" id="toggle-categories-panel" type="button">${categoriesPanelOpen ? "Ocultar categorias" : "Editar categorias"}</button>
+      </div>
+      ${categoriesPanelOpen ? `
+        <div class="grid-2 categories-editor">
+          <div class="panel">
+            <h2>Categorias de receitas</h2>
+            <div class="list">${state.categoriesIncome.map((item) => categoryRow(item, "Receita")).join("")}</div>
+          </div>
+          <div class="panel">
+            <h2>Categorias de despesas</h2>
+            <div class="list">${state.categoriesExpense.map((item) => categoryRow(item, "Despesa")).join("")}</div>
+          </div>
+        </div>
+        <form class="settings-form" id="category-form">
+          <div class="span-3"><h2>Nova categoria</h2></div>
+          ${select("kind", "Tipo", ["Receita", "Despesa"])}
+          ${input("name", "Nova categoria", "text", "")}
+          <button class="primary" type="submit">Adicionar</button>
+        </form>
+      ` : ""}
       <form class="settings-form" id="budget-form">
         <div class="span-3"><h2>Orçamento por categoria</h2></div>
         ${select("category", "Categoria", state.categoriesExpense)}
@@ -3254,13 +3264,6 @@ function renderSettings() {
         <div class="list">
           <button class="ghost" id="export-data" type="button">Exportar dados</button>
           <label class="field"><span>Importar backup com cuidado</span><input id="import-data" type="file" accept="application/json"></label>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Instalar como app</h2>
-        <div class="list">
-          <div class="list-item"><div><strong>iPhone</strong><span>Abra no Safari, toque em Compartilhar e depois Adicionar à Tela de Início.</span></div></div>
-          <div class="list-item"><div><strong>Android</strong><span>Abra no Chrome e toque em Instalar app ou Adicionar à tela inicial.</span></div></div>
         </div>
       </div>
       <div class="panel danger-zone">
@@ -3295,7 +3298,11 @@ function renderSettings() {
     </div>
   `;
   qs("#profile-form").addEventListener("submit", saveProfile);
-  qs("#category-form").addEventListener("submit", addCategory);
+  qs("#toggle-categories-panel").addEventListener("click", () => {
+    categoriesPanelOpen = !categoriesPanelOpen;
+    renderSettings();
+  });
+  qs("#category-form")?.addEventListener("submit", addCategory);
   qs("#budget-form").addEventListener("submit", saveBudget);
   qs("#export-data").addEventListener("click", exportData);
   qs("#import-data").addEventListener("change", importData);
@@ -3328,9 +3335,9 @@ function personAvatar(name, tone) {
 
 function categoryRow(item, kind) {
   return `
-    <div class="list-item">
+    <div class="list-item category-row">
       <strong>${item}</strong>
-      <span>
+      <span class="category-actions">
         <button class="tiny ghost" data-edit-category="${kind}|${item}">Editar</button>
         <button class="tiny danger" data-delete-category="${kind}|${item}">Excluir</button>
       </span>

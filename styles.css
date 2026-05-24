@@ -86,6 +86,195 @@
   }
 }
 
+.category-row {
+  align-items: center;
+  gap: 14px;
+}
+
+.category-row strong {
+  min-width: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.category-row .category-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.category-row .category-actions .tiny {
+  min-width: 76px;
+  min-height: 38px;
+  border-radius: 14px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.category-row .category-actions .tiny + .tiny {
+  margin-left: 0;
+}
+
+@media (max-width: 720px) {
+  .category-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .category-row .category-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .category-row .category-actions .tiny {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 44px;
+    border-radius: 16px;
+  }
+}
+
+/* Button system polish: one visual language across the app. */
+.primary,
+.ghost,
+.danger,
+.tiny,
+.mode-picker button,
+.statement-filter-toggle,
+.card-setup-toggle,
+.action-chip,
+.quick-shortcut,
+.setup-step,
+.more-card {
+  font-weight: 850;
+  letter-spacing: 0;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease, filter .16s ease;
+}
+
+.primary,
+.ghost,
+.danger {
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  white-space: normal;
+}
+
+.primary,
+body.app-ready .primary {
+  color: #061225;
+  background: linear-gradient(135deg, #13d8ff 0%, #2563ff 56%, #7b5cff 100%);
+  border: 1px solid rgba(255, 255, 255, .16);
+  box-shadow: 0 14px 30px rgba(37, 99, 255, .28);
+}
+
+.ghost,
+body.app-ready .ghost {
+  color: #f6f9ff;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(210, 226, 255, .16);
+  box-shadow: none;
+}
+
+.danger,
+body.app-ready .danger {
+  color: #fff;
+  background: linear-gradient(135deg, #ff4d3d, #ff8a3d);
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 12px 26px rgba(255, 77, 61, .22);
+}
+
+.tiny,
+body.app-ready .tiny {
+  min-height: 36px;
+  min-width: 76px;
+  border-radius: 13px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.list-item .tiny + .tiny {
+  margin-left: 6px;
+}
+
+.mode-picker {
+  border-radius: 20px;
+}
+
+.mode-picker button {
+  min-height: 46px;
+  border-radius: 15px;
+}
+
+.primary:hover,
+.ghost:hover,
+.danger:hover,
+.tiny:hover,
+.mode-picker button:hover,
+.action-chip:hover,
+.quick-shortcut:hover,
+.setup-step:hover,
+.more-card:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+}
+
+.primary:active,
+.ghost:active,
+.danger:active,
+.tiny:active,
+.mode-picker button:active,
+.action-chip:active,
+.quick-shortcut:active,
+.setup-step:active,
+.more-card:active {
+  transform: translateY(1px) scale(.99);
+}
+
+@media (max-width: 720px) {
+  .primary,
+  .ghost,
+  .danger {
+    min-height: 52px;
+    border-radius: 18px;
+    padding: 0 16px;
+    width: 100%;
+    font-size: 15px;
+  }
+
+  .tiny,
+  body.app-ready .tiny {
+    min-height: 40px;
+    min-width: 84px;
+    border-radius: 14px;
+    font-size: 13px;
+  }
+
+  .list-item span:has(.tiny) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .list-item .tiny + .tiny {
+    margin-left: 0;
+  }
+}
+
 body.app-ready:not([data-view="dashboard"]) .top-actions::before {
   display: none !important;
 }
@@ -2313,6 +2502,26 @@ body.app-ready:not([data-view="dashboard"]) .period-switcher.period-switcher-old
   min-width: 170px;
 }
 
+.settings-summary-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-summary-panel p {
+  margin: 6px 0 0;
+}
+
+.settings-summary-panel .ghost {
+  width: auto;
+  min-width: 170px;
+}
+
+.categories-editor {
+  align-items: start;
+}
+
 .guided-form {
   grid-template-columns: repeat(4, minmax(150px, 1fr));
 }
@@ -3756,6 +3965,15 @@ button.list-item {
 
   .settings-form {
     grid-template-columns: 1fr;
+  }
+
+  .settings-summary-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-summary-panel .ghost {
+    width: 100%;
   }
 
   .soft-panel,
