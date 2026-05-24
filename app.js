@@ -1668,11 +1668,12 @@ function initialSetupPanel() {
     }
   ];
   if (steps.every((step) => step.done)) return "";
+  const nextStep = steps.find((step) => !step.done);
   return `
     <div class="panel setup-panel">
       <div>
-        <h2>Comece pelo básico</h2>
-        <p>Com esses dados, o app já consegue calcular saldo, fatura, contas e previsão do mês.</p>
+        <h2>Primeiros passos</h2>
+        <p>Próximo: ${nextStep.title}. Depois disso o app já calcula melhor saldo, fatura e previsão.</p>
       </div>
       <div class="setup-steps">
         ${steps.map((step) => `
@@ -2186,6 +2187,12 @@ function accountOptions() {
 
 function renderStatement() {
   const cardInvoices = state.cards.map(cardStatementSummary);
+  const rowsSummary = {
+    income: total(byMonth(state.entries).filter((item) => item.type === "Receita")),
+    expense: total(byMonth(state.entries).filter((item) => item.type === "Despesa")),
+    card: total(cardInvoices.map((item) => ({ value: item.invoiceTotal }))),
+    fixed: total((state.fixedBills || []).filter((item) => isFixedPaid(item)).map((item) => ({ value: item.value })))
+  };
   let rows = [
     ...byMonth(state.entries).map((item) => ({
       id: item.id,
@@ -2253,10 +2260,18 @@ function renderStatement() {
   const groupedRows = groupStatementRows(rows);
 
   qs("#statement").innerHTML = `
-    <div class="panel helper-panel">
-      <h2>Extrato do mês</h2>
-      <p>Veja tudo que foi lançado em ${state.selectedMonth} de ${state.selectedYear}: entradas, saídas, faturas e contas fixas. Se marcou algo errado, altere aqui.</p>
-    </div>
+    <section class="feature-hero statement-hero">
+      <div>
+        <span>Extrato financeiro</span>
+        <h2>${state.selectedMonth} de ${state.selectedYear}</h2>
+        <p>Busque, filtre, edite e confira tudo que entrou, saiu, ficou aberto ou foi pago.</p>
+      </div>
+      <div class="feature-stats">
+        <div><span>Entradas</span><strong>${formatMoney(rowsSummary.income)}</strong></div>
+        <div><span>Saídas</span><strong>${formatMoney(rowsSummary.expense + rowsSummary.fixed)}</strong></div>
+        <div><span>Cartões</span><strong>${formatMoney(rowsSummary.card)}</strong></div>
+      </div>
+    </section>
     <div class="statement-tools panel">
       <label class="field">
         <span>Buscar no extrato</span>
@@ -2568,12 +2583,13 @@ function renderCards() {
   const cardLimit = total(state.cards.map((card) => ({ value: card.limit })));
   const cardUsed = total(state.cards.map((card) => ({ value: cardTotals(card.name).used })));
   const cardAvailable = cardLimit - cardUsed;
+  const currentCard = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
   qs("#cards").innerHTML = `
     <section class="feature-hero cards-hero">
       <div>
         <span>Crédito organizado</span>
         <h2>Cartões e faturas</h2>
-        <p>Cadastre cartões, acompanhe limite, fechamento, vencimento e faturas. Compras no cartão ficam em Lançamentos.</p>
+        <p>Configure os cartões aqui. As compras ficam em Lançamentos e a fatura aparece nesta tela.</p>
       </div>
       <div class="feature-stats">
         <div><span>Fatura mês</span><strong>${formatMoney(summary.cardMonth)}</strong></div>
@@ -2581,16 +2597,22 @@ function renderCards() {
         <div><span>Usado total</span><strong>${formatMoney(cardUsed)}</strong></div>
       </div>
     </section>
-    <form class="entry-form guided-form" id="card-settings-form">
-      <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Configure limite, fechamento e vencimento para calcular faturas.</small></div></div>
-      ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
-      ${select("owner", "Titular", appPeople(), "", "Pessoa responsável pelo cartão.")}
-      ${input("limit", "Limite", "number", "0", "0.01", "Limite total disponível no cartão.")}
-      ${input("closeDay", "Dia que fecha", "number", "20", "1", "Compras depois desse dia entram na próxima fatura.")}
-      ${input("dueDay", "Dia de vencimento", "number", "10", "1", "Dia em que a fatura vence.")}
-      ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda o visual do cartão.")}
-      <button class="primary" type="submit">Salvar cartão</button>
-    </form>
+    <div class="cards-layout">
+      <form class="entry-form guided-form card-setup-card" id="card-settings-form">
+        <div class="span-3 form-heading"><span>▣</span><div><h2>Novo cartão</h2><small>Limite, fechamento e vencimento.</small></div></div>
+        ${input("name", "Nome do cartão", "text", "", "", "Ex: Nubank, Inter, Itaú.")}
+        ${select("owner", "Titular", appPeople(), "", "Pessoa responsável pelo cartão.")}
+        ${input("limit", "Limite", "number", "0", "0.01", "Limite total disponível no cartão.")}
+        ${input("closeDay", "Dia que fecha", "number", "20", "1", "Compras depois desse dia entram na próxima fatura.")}
+        ${input("dueDay", "Dia de vencimento", "number", "10", "1", "Dia em que a fatura vence.")}
+        ${select("color", "Cor", ["Azul", "Roxo", "Dourado", "Preto", "Verde"], "", "Só muda o visual do cartão.")}
+        <button class="primary" type="submit">Salvar cartão</button>
+      </form>
+      <div class="panel soft-panel invoice-focus">
+        <div class="section-title"><span>▣</span><div><h2>Fatura atual</h2><small>${currentCard ? `${currentCard.name} · ${state.selectedMonth}/${state.selectedYear}` : "Cadastre um cartão para começar."}</small></div></div>
+        ${currentCard ? cardInvoiceRow(currentCard) : emptyHtml()}
+      </div>
+    </div>
     <div class="panel soft-panel">
       <div class="section-title"><span>▣</span><div><h2>Meus cartões</h2><small>Limite, vencimento, fechamento e fatura atual.</small></div></div>
       <div class="grid-3 card-grid">
@@ -2598,7 +2620,7 @@ function renderCards() {
       </div>
     </div>
     <div class="panel soft-panel">
-      <div class="section-title"><span>▣</span><div><h2>Faturas (${state.selectedMonth})</h2></div></div>
+      <div class="section-title"><span>☷</span><div><h2>Todas as faturas</h2><small>Troque o cartão nos detalhes para ver compras e pagamentos.</small></div></div>
       <div class="list">
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
@@ -2621,7 +2643,7 @@ function cardDetailHtml() {
   const summary = cardStatementSummary(card);
   return `
     <div class="panel soft-panel card-detail-panel" id="card-detail-panel">
-      <div class="section-title"><span>▣</span><div><h2>Detalhe da fatura: ${card.name}</h2><small>Total ${formatMoney(summary.invoiceTotal)} · pago ${formatMoney(summary.paidItems + summary.payments)} · aberto ${formatMoney(summary.open)}</small></div></div>
+      <div class="section-title"><span>▣</span><div><h2>Compras e pagamentos: ${card.name}</h2><small>Total ${formatMoney(summary.invoiceTotal)} · pago ${formatMoney(summary.paidTotal)} · aberto ${formatMoney(summary.open)}</small></div></div>
       <label class="field statement-card-select">
         <span>Ver cartão</span>
         <select id="invoice-card-detail-select">
