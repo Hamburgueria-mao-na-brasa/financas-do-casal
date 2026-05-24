@@ -1554,8 +1554,9 @@ function ensureMoreNavigation() {
   if (tabs && !qs('[data-view="more"]', tabs)) {
     tabs.insertAdjacentHTML("beforeend", `<button class="tab tab-more" data-view="more" title="Mais">☰ <span>Mais</span></button>`);
   }
-  if (!qs("#more")) {
-    qs(".shell").insertAdjacentHTML("beforeend", `<section class="view" id="more"></section>`);
+  const shell = qs(".shell");
+  if (shell && !qs("#more")) {
+    shell.insertAdjacentHTML("beforeend", `<section class="view" id="more"></section>`);
   }
 }
 
@@ -3128,6 +3129,9 @@ function addGoal(event) {
 }
 
 function renderMore() {
+  ensureMoreNavigation();
+  const moreView = qs("#more");
+  if (!moreView) return;
   const summary = currentSummary();
   const closed = isMonthClosed();
   const items = [
@@ -3138,7 +3142,7 @@ function renderMore() {
     { view: "method", icon: "◴", title: "50/30/20", note: "Planejamento automático pela renda do casal", tone: "gold" },
     { view: "settings", icon: "⚙", title: "Cadastros e configurações", note: "Perfil, convite, backup, sair e reiniciar", tone: "violet" }
   ];
-  qs("#more").innerHTML = `
+  moreView.innerHTML = `
     <section class="more-hero">
       <div>
         <span>Menu do casal</span>
@@ -3171,8 +3175,8 @@ function renderMore() {
       <span><strong>${closed ? "Mês fechado" : "Fechar mês"}</strong><small>${closed ? "Reabrir para permitir ajustes" : "Marcar este mês como conferido"}</small></span>
     </button>
   `;
-  qs("#logout-more").addEventListener("click", signOut);
-  qs("#toggle-month-closed").addEventListener("click", () => {
+  qs("#logout-more", moreView)?.addEventListener("click", signOut);
+  qs("#toggle-month-closed", moreView)?.addEventListener("click", () => {
     const key = periodKey();
     const closedMonths = new Set(state.closedMonths || []);
     if (closedMonths.has(key)) closedMonths.delete(key);
