@@ -734,6 +734,7 @@ function renderNotifications() {
   }
 
   const items = state.notifications || [];
+  const groups = notificationGroups(items);
   panel.classList.add("open");
   panel.innerHTML = `
     <div class="notifications-head">
@@ -741,7 +742,7 @@ function renderNotifications() {
       <button class="tiny ghost" id="mark-read" type="button">Marcar lidas</button>
     </div>
     <div class="notifications-list">
-      ${items.length ? items.map(notificationItem).join("") : `<div class="empty"><strong>Nada por aqui</strong><span>As novidades do casal aparecem aqui.</span></div>`}
+      ${items.length ? groups.map(([title, groupItems]) => groupItems.length ? `<section class="notification-group"><h2>${title}</h2>${groupItems.map(notificationItem).join("")}</section>` : "").join("") : `<div class="empty"><strong>Nada por aqui</strong><span>As novidades do casal aparecem aqui.</span></div>`}
     </div>
   `;
   qs("#mark-read").addEventListener("click", () => {
@@ -750,6 +751,15 @@ function renderNotifications() {
     notificationsOpen = true;
     renderNotifications();
   });
+}
+
+function notificationGroups(items) {
+  return [
+    ["Mudanças do parceiro", items.filter((item) => item.source !== "auto" && item.actorId && item.actorId !== currentActorId())],
+    ["Contas e faturas", items.filter((item) => item.type === "card" || item.text?.toLowerCase().includes("vence") || item.text?.toLowerCase().includes("fatura"))],
+    ["Alertas do sistema", items.filter((item) => item.source === "auto" && item.type !== "card" && !item.text?.toLowerCase().includes("vence"))],
+    ["Minhas alterações", items.filter((item) => item.source !== "auto" && (!item.actorId || item.actorId === currentActorId()))]
+  ];
 }
 
 function renderTutorial() {
@@ -1469,9 +1479,11 @@ function renderMonthFilter() {
     yearSelect.innerHTML = years.map((year) => `<option value="${year}" ${Number(state.selectedYear) === year ? "selected" : ""}>${year}</option>`).join("");
   }
   const switcher = qs("#period-switcher");
+  const topActions = qs(".top-actions");
+  if (switcher && topActions && switcher.parentElement !== topActions) topActions.appendChild(switcher);
   if (switcher) {
     switcher.innerHTML = `
-      <label class="field compact">
+      <label class="field compact period-month">
         <span>Mês</span>
         <select data-period-month>${months.map((month) => `<option ${month === state.selectedMonth ? "selected" : ""}>${month}</option>`).join("")}</select>
       </label>
@@ -1567,9 +1579,14 @@ function dashboardForecastHtml(summary = currentSummary()) {
   const openInvoices = total(state.cards.map((card) => ({ value: cardStatementSummary(card).open })));
   const fixedPending = summary.fixedPending;
   const projected = summary.balance - fixedPending - openInvoices;
+  const cardShare = summary.salaryTotal ? Math.round((summary.cardMonth / Math.max(1, summary.salaryTotal)) * 100) : 0;
+  const phrase = projected >= 0
+    ? `Se vocês pagarem as pendências, ainda sobram ${formatMoney(projected)}.`
+    : `Se pagarem tudo que está aberto, faltam ${formatMoney(Math.abs(projected))}.`;
   return `
     <div class="panel dashboard-forecast">
       <div class="section-title"><span>↯</span><div><h2>Previsão do mês</h2><small>Se pagar o que ainda está aberto.</small></div></div>
+      <div class="smart-phrase">${phrase}${cardShare ? ` Cartões usam ${cardShare}% da renda disponível.` : ""}</div>
       <div class="forecast-grid">
         <div><span>Saldo agora</span><strong>${formatMoney(summary.balance)}</strong></div>
         <div><span>Faturas abertas</span><strong>${formatMoney(openInvoices)}</strong></div>
@@ -2765,6 +2782,7 @@ function cardSummary(card) {
     </div>
     <div class="track card-track"><div class="fill" style="--w:${percent}%;--c:rgba(255,255,255,.88)"></div></div>
     <div class="card-actions">
+      <button class="tiny ghost" data-card-detail="${card.name}">Ver fatura</button>
       <button class="tiny ghost" data-edit-card="${card.id}">Editar</button>
       <button class="tiny danger" data-delete-card="${card.id}">Excluir cartão</button>
     </div>
@@ -3058,6 +3076,10 @@ function renderMore() {
           <span><strong>${item.title}</strong><small>${item.note}</small></span>
         </button>
       `).join("")}
+      <button class="more-card cyan" type="button" data-install-help>
+        <b>⇩</b>
+        <span><strong>Instalar no celular</strong><small>Atalho para Android e iPhone</small></span>
+      </button>
     </div>
     <button class="more-card logout-card logout-card-top" type="button" id="logout-more">
       <b>↩</b>
@@ -3482,6 +3504,13 @@ document.addEventListener("click", (event) => {
       ]
     };
     openItemActions(optionsByKind[kind] || []);
+    return;
+  }
+
+  const installHelpButton = event.target.closest("[data-install-help]");
+  if (installHelpButton) {
+    modalMode = { kind: "installHelp", id: "install", fields: [] };
+    renderModal();
     return;
   }
 

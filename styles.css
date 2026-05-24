@@ -501,54 +501,41 @@ h2 {
 }
 
 .period-switcher {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 55;
   display: none;
   align-items: end;
   gap: 10px;
-  width: min(360px, calc(100vw - 48px));
-  padding: 10px;
-  border: 1px solid rgba(183, 255, 238, .18);
-  border-radius: 22px;
-  background: rgba(6, 18, 37, .88);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, .28);
-  backdrop-filter: blur(18px);
-}
-
-body.app-ready .period-switcher {
-  display: flex;
-}
-
-body.app-ready[data-view="dashboard"] .period-switcher {
-  bottom: 18px;
+  margin: 0;
+  padding: 0;
 }
 
 .period-switcher::before {
+  content: "";
+  display: none;
+}
+
+body.app-ready:not([data-view="dashboard"]) .top-actions::before {
   content: "Período";
   align-self: center;
-  padding: 0 4px 0 2px;
-  color: rgba(242, 255, 249, .74);
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 900;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 10px 20px rgba(22, 52, 47, .06);
+}
+
+body.app-ready:not([data-view="dashboard"]) .period-switcher {
+  display: flex;
 }
 
 .period-switcher .field.compact {
   flex: 1;
   min-width: 0;
-  background: rgba(255, 255, 255, .08);
-  border-color: rgba(183, 255, 238, .16);
-  box-shadow: none;
-}
-
-.period-switcher .field.compact span {
-  color: rgba(242, 255, 249, .64);
-}
-
-.period-switcher .field.compact select {
-  color: #f2fff9;
-  background: transparent;
 }
 
 .cloud-panel {
@@ -3893,17 +3880,7 @@ button.list-item {
   }
 
   body.app-ready .period-switcher {
-    left: 16px;
-    right: 16px;
-    bottom: calc(84px + env(safe-area-inset-bottom));
-    width: auto;
-    grid-template-columns: auto minmax(0, 1fr) 96px;
-    padding: 8px;
-    border-radius: 20px;
-  }
-
-  body.app-ready .period-switcher::before {
-    font-size: 11px;
+    display: contents;
   }
 
   body.app-ready .cloud-panel {
