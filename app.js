@@ -834,7 +834,7 @@ function renderModal() {
 }
 
 function editModalHtml(config) {
-  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", cardRecurring: "Editar fixo no cartão", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
+  const title = { fixed: "Editar conta fixa", account: "Editar carteira", card: "Editar cartão", installment: "Editar compra do cartão", cardRecurring: "Editar fixo no cartão", cardPayment: "Editar pagamento da fatura", goal: "Editar meta", category: "Editar categoria", goalAdd: "Adicionar valor à meta" }[config.kind] || "Editar";
   const fields = config.fields.map(editFieldHtml).join("");
   return `
     <div class="modal-card">
@@ -895,8 +895,11 @@ function saveEditModal(event) {
     const item = state.installments.find((installment) => installment.id === data.id);
     if (item) {
       const purchaseDate = new Date(`${data.date}T00:00:00Z`);
-      const purchaseMonthIndex = Number.isNaN(purchaseDate.getTime()) ? monthIndex(data.firstMonth) : purchaseDate.getUTCMonth();
-      const firstYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear() + (monthIndex(data.firstMonth) < purchaseMonthIndex ? 1 : 0);
+      const purchaseMonth = Number.isNaN(purchaseDate.getTime()) ? state.selectedMonth : months[purchaseDate.getUTCMonth()];
+      const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
+      const firstMonth = data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
+      const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
+      const firstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
       Object.assign(item, {
         date: data.date,
         card: data.card,
@@ -904,7 +907,7 @@ function saveEditModal(event) {
         category: data.category,
         value: Number(data.value || 0),
         parts: Math.max(1, Number(data.parts || 1)),
-        firstMonth: data.firstMonth,
+        firstMonth,
         firstYear
       });
     }
@@ -920,6 +923,10 @@ function saveEditModal(event) {
         day: Number(data.day || 1)
       });
     }
+  }
+  if (data.kind === "cardPayment") {
+    const item = state.cardPayments.find((payment) => payment.id === data.id);
+    if (item) Object.assign(item, { description: data.description, value: Number(data.value || 0), date: data.date });
   }
   if (data.kind === "goal") {
     const item = state.goals.find((goal) => goal.id === data.id);
@@ -2220,7 +2227,7 @@ function fixedDateForMonth(item) {
 }
 
 function recurringCardDateForMonth(item) {
-  return new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
+  return cardRecurringItemsForInvoice(item.card).find((entry) => entry.installmentId === item.id)?.date || recurringChargeDate(item);
 }
 
 function cardPaymentRows(cardName = "") {
@@ -2481,6 +2488,11 @@ function renderCards() {
     ${cardDetailHtml()}
   `;
   qs("#card-settings-form").addEventListener("submit", addCard);
+  const detailSelect = qs("#invoice-card-detail-select");
+  if (detailSelect) detailSelect.addEventListener("change", (event) => {
+    selectedInvoiceCard = event.target.value;
+    renderCards();
+  });
 }
 
 function cardDetailHtml() {
@@ -2577,18 +2589,8 @@ function cardMonthItems(cardName) {
     .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
     .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear));
   const recurring = state.cardRecurring
-    .filter((item) => sameCard(item.card, cardName) && item.active !== false)
-    .map((item) => ({
-      month: state.selectedMonth,
-      year: Number(state.selectedYear),
-      date: recurringCardDateForMonth(item),
-      value: Number(item.value || 0),
-      paid: isPeriodPaid(item),
-      installmentId: item.id,
-      description: item.description,
-      category: item.category,
-      partLabel: "fixo mensal"
-    }));
+    ? cardRecurringItemsForInvoice(cardName)
+    : [];
   return [...installments, ...recurring];
 }
 
@@ -2631,11 +2633,10 @@ function addInstallment(event) {
   }
   const purchaseMonth = months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()];
   const purchaseDate = new Date(`${data.date}T00:00:00Z`);
-  const realInvoiceMonth = invoiceMonthForPurchase(data.date, data.card);
-  const firstMonth = data.firstMonth === purchaseMonth ? realInvoiceMonth : data.firstMonth;
-  const firstMonthIndex = monthIndex(firstMonth);
-  const purchaseMonthIndex = Number.isNaN(purchaseDate.getTime()) ? firstMonthIndex : purchaseDate.getUTCMonth();
-  const firstYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear() + (firstMonthIndex < purchaseMonthIndex ? 1 : 0);
+  const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
+  const firstMonth = data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
+  const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
+  const firstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
@@ -3303,8 +3304,8 @@ document.addEventListener("click", (event) => {
           const card = state.cards.find((item) => item.id === id);
           state.cards = state.cards.filter((item) => item.id !== id);
           if (card) {
-            state.installments = state.installments.filter((item) => item.card !== card.name);
-            state.cardRecurring = state.cardRecurring.filter((item) => item.card !== card.name);
+            state.installments = state.installments.filter((item) => !sameCard(item.card, card.name));
+            state.cardRecurring = state.cardRecurring.filter((item) => !sameCard(item.card, card.name));
           }
         } else if (datasetKey === "deleteAccount") {
           const account = state.accounts.find((item) => item.id === id);
@@ -3348,6 +3349,22 @@ document.addEventListener("click", (event) => {
   if (event.target.dataset.editInstallment) editInstallment(event.target.dataset.editInstallment);
   if (event.target.dataset.editCardRecurring) editCardRecurring(event.target.dataset.editCardRecurring);
   if (event.target.dataset.editAccount) editAccount(event.target.dataset.editAccount);
+  if (event.target.dataset.cardDetail) {
+    selectedInvoiceCard = event.target.dataset.cardDetail;
+    setActiveView("cards");
+    renderCards();
+  }
+  if (event.target.dataset.editCardPayment) {
+    const item = state.cardPayments.find((payment) => payment.id === event.target.dataset.editCardPayment);
+    if (item) {
+      modalMode = { kind: "cardPayment", id: item.id, fields: [
+        { name: "description", label: "Descrição", value: item.description },
+        { name: "value", label: "Valor pago", type: "number", step: "0.01", value: item.value },
+        { name: "date", label: "Data do pagamento", type: "date", value: item.date }
+      ] };
+      renderModal();
+    }
+  }
 
   if (event.target.dataset.editCategory) {
     const [kind, oldName] = event.target.dataset.editCategory.split("|");
