@@ -2059,13 +2059,6 @@ function renderEntries() {
       <button class="primary" type="submit">Salvar compra no cartão</button>
     </form>
     <div class="panel soft-panel">
-      <div class="section-title"><span>↻</span><div><h2>Fixos configurados</h2><small>Use isto apenas para gerar receitas/despesas recorrentes antigas.</small></div></div>
-      <div class="list">
-        ${state.recurring.length ? state.recurring.map((item) => `<div class="list-item"><div><strong>${item.description}</strong><span>${item.type === "Receita" ? "Entrada" : "Saída"} · dia ${item.day} · ${item.category}</span></div><b>${formatMoney(item.value)}</b></div>`).join("") : emptyHtml()}
-      </div>
-      <button class="ghost" id="generate-recurring" type="button">Gerar fixos deste mês</button>
-    </div>
-    <div class="panel soft-panel">
       <div class="section-title"><span>☷</span><div><h2>Lançamentos do mês</h2><small>Filtre, edite ou exclua quando precisar.</small></div></div>
       <div class="mode-picker filter-tabs">
         ${["Todos", "Entrada", "Saída", "Pago", "Pendente"].map((filter) => `<button class="${entryFilter === filter ? "active" : ""}" type="button" data-entry-filter="${filter}">${filter}</button>`).join("")}
@@ -2094,7 +2087,8 @@ function renderEntries() {
   `;
   qs("#entry-form").addEventListener("submit", addEntry);
   qs("#card-form").addEventListener("submit", addInstallment);
-  qs("#generate-recurring").addEventListener("click", generateRecurring);
+  const recurringButton = qs("#generate-recurring");
+  if (recurringButton) recurringButton.addEventListener("click", generateRecurring);
   const cancel = qs("#cancel-edit");
   if (cancel) cancel.addEventListener("click", () => {
     editingEntryId = null;
