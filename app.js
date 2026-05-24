@@ -24,7 +24,8 @@ const seed = {
   tutorialDone: false,
   privacyMode: false,
   recurring: [],
-  budgets: {}
+  budgets: {},
+  paidMonthsMigrated: false
 };
 
 let state = loadState();
@@ -35,6 +36,8 @@ let householdMembers = [];
 let cloudReady = false;
 let saveTimer = null;
 let loadingCloud = false;
+let savingCloud = false;
+let cloudSaveQueued = false;
 let authMode = "signin";
 let entryMode = "Despesa";
 let syncStatus = "";
@@ -59,10 +62,10 @@ const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const tutorialSteps = [
   ["Visão geral", "Veja saldo do mês, entradas, saídas, cartões, contas fixas, metas, alertas e o resumo inteligente."],
-  ["Lançamentos", "Registre somente entradas e saídas feitas na hora. Compras no cartão ficam na aba Cartões."],
+  ["Lançamentos", "Registre entradas, saídas e compras no cartão. As faturas ficam organizadas na aba Cartões."],
   ["Despesas Fixas", "Cadastre aluguel, internet, energia e dívidas mensais. Marque como pago quando sair o dinheiro."],
   ["Nossa Carteira", "Cadastre contas, cartões e rendas como salário. É a base do controle."],
-  ["Cartões", "Lance compras parceladas e acompanhe fatura atual, próxima fatura e limite usado."],
+  ["Cartões", "Cadastre cartões e acompanhe fatura atual, próxima fatura, pagamentos e limite usado."],
   ["50/30/20", "Planeje renda entre essenciais, investimentos e desejos."],
   ["Metas", "Acompanhe objetivos do casal e edite valor guardado ou valor total quando precisar."],
   ["Cadastros", "Ajuste nomes, salários, categorias, recorrências, orçamento e backup."]
@@ -90,6 +93,7 @@ function ensureStateShape() {
   state.notifications ||= [];
   state.accounts ||= [];
   state.cards ||= [];
+  state.cards = state.cards.map((item) => ({ ...item, owner: item.owner || state.profile?.personOne || "Ele", color: item.color || "Azul" }));
   state.cards = state.cards.map((item) => ({ ...item, closeDay: Number(item.closeDay || 20), dueDay: Number(item.dueDay || 10) }));
   state.entries ||= [];
   state.installments ||= [];
@@ -99,6 +103,7 @@ function ensureStateShape() {
   state.cardPayments ||= [];
   state.fixedBills ||= [];
   state.fixedBills = state.fixedBills.map((item) => ({ ...item, paidMonths: item.paidMonths || (item.status === "Pago" ? [state.selectedMonth] : []) }));
+  if (!state.paidMonthsMigrated) migratePaidMonths();
   state.goals ||= [];
   state.profile ||= { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0 };
   state.profile.salaryOne ||= 0;
@@ -112,6 +117,22 @@ function ensureStateShape() {
   if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
   if (typeof state.tutorialDone !== "boolean") state.tutorialDone = false;
   if (typeof state.privacyMode !== "boolean") state.privacyMode = false;
+}
+
+function normalizePaidMonths(paidMonths = []) {
+  const assumedYear = Number(state.selectedYear || new Date().getFullYear());
+  return [...new Set(paidMonths.map((month) => {
+    const text = String(month || "").trim();
+    if (!text) return "";
+    return text.includes(":") ? text : periodKey(text, assumedYear);
+  }).filter((month) => month && (month.includes(":") ? months.includes(month.split(":")[1]) : months.includes(month))))];
+}
+
+function migratePaidMonths() {
+  state.fixedBills = (state.fixedBills || []).map((item) => ({ ...item, paidMonths: normalizePaidMonths(item.paidMonths) }));
+  state.installments = (state.installments || []).map((item) => ({ ...item, paidMonths: normalizePaidMonths(item.paidMonths) }));
+  state.cardRecurring = (state.cardRecurring || []).map((item) => ({ ...item, paidMonths: normalizePaidMonths(item.paidMonths) }));
+  state.paidMonthsMigrated = true;
 }
 
 function saveState(sync = false) {
@@ -262,12 +283,12 @@ function recurringChargeDate(item, chargeMonthIndex = monthIndex(state.selectedM
 
 function isFixedPaid(item, month = state.selectedMonth, year = state.selectedYear) {
   const paid = item.paidMonths || [];
-  return paid.includes(periodKey(month, year)) || paid.includes(month);
+  return paid.includes(periodKey(month, year));
 }
 
 function isPeriodPaid(item, month = state.selectedMonth, year = state.selectedYear) {
   const paid = item.paidMonths || [];
-  return paid.includes(periodKey(month, year)) || paid.includes(month);
+  return paid.includes(periodKey(month, year));
 }
 
 function salaryPlannedTotal() {
@@ -907,11 +928,15 @@ function saveEditModal(event) {
     if (item) {
       const oldName = item.name;
       item.name = data.name;
+      item.owner = data.owner || item.owner || appPeople()[0];
       item.limit = Number(data.limit || 0);
       item.closeDay = Number(data.closeDay || 20);
       item.dueDay = Number(data.dueDay || 10);
+      item.color = data.color || item.color || "Azul";
       state.installments = state.installments.map((installment) => sameCard(installment.card, oldName) ? { ...installment, card: item.name } : installment);
       state.cardRecurring = state.cardRecurring.map((fixed) => sameCard(fixed.card, oldName) ? { ...fixed, card: item.name } : fixed);
+      state.cardPayments = (state.cardPayments || []).map((payment) => sameCard(payment.card, oldName) ? { ...payment, card: item.name } : payment);
+      if (sameCard(selectedInvoiceCard, oldName)) selectedInvoiceCard = item.name;
     }
   }
   if (data.kind === "installment") {
@@ -922,7 +947,8 @@ function saveEditModal(event) {
       const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
       const firstMonth = data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
       const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
-      const firstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
+      const inferredFirstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
+      const firstYear = Number(data.firstYear || inferredFirstYear);
       Object.assign(item, {
         date: data.date,
         card: data.card,
@@ -1321,6 +1347,12 @@ function scheduleCloudSave() {
 
 async function saveCloudState() {
   if (!cloudReady || !householdId) return;
+  if (savingCloud) {
+    cloudSaveQueued = true;
+    return;
+  }
+  savingCloud = true;
+  cloudSaveQueued = false;
   syncStatus = "Salvando...";
   const { error } = await cloud.from("household_states").upsert({
     household_id: householdId,
@@ -1331,6 +1363,7 @@ async function saveCloudState() {
     syncStatus = `Erro ao salvar: ${error.message}`;
     showToast(syncStatus, "error");
     renderCloudPanel();
+    savingCloud = false;
     return;
   }
 
@@ -1341,8 +1374,11 @@ async function saveCloudState() {
     .single();
   if (!readError) lastCloudUpdatedAt = saved.updated_at;
   syncStatus = readError ? `Salvo, mas não conferido: ${readError.message}` : `Salvo ${formatSyncTime(saved.updated_at)}`;
+  localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
   showToast(readError ? "Salvo, mas não consegui conferir a nuvem" : "Salvo na nuvem", readError ? "info" : "success");
   renderCloudPanel();
+  savingCloud = false;
+  if (cloudSaveQueued) await saveCloudState();
 }
 
 function startCloudPolling() {
@@ -1352,7 +1388,7 @@ function startCloudPolling() {
 }
 
 async function refreshCloudState() {
-  if (!cloudReady || !householdId || loadingCloud) return;
+  if (!cloudReady || !householdId || loadingCloud || savingCloud) return;
   const { data, error } = await cloud
     .from("household_states")
     .select("data, updated_at")
@@ -2296,12 +2332,14 @@ function cardStatementSummary(card) {
   const invoiceTotal = total(items);
   const paidItems = total(items.filter((item) => item.paid));
   const payments = cardPaymentTotal(card.name);
+  const paidTotal = Math.min(invoiceTotal, paidItems + payments);
   return {
     card: card.name,
     invoiceTotal,
     paidItems,
     payments,
-    open: Math.max(0, invoiceTotal - paidItems - payments),
+    paidTotal,
+    open: Math.max(0, invoiceTotal - paidTotal),
     itemCount: items.length
   };
 }
@@ -2315,7 +2353,7 @@ function cardStatementCard(item) {
       </div>
       <div class="card-statement-values">
         <span>Total <b>${formatMoney(item.invoiceTotal)}</b></span>
-        <span>Pago <b>${formatMoney(item.paidItems + item.payments)}</b></span>
+        <span>Pago <b>${formatMoney(item.paidTotal)}</b></span>
         <span>Aberto <b>${formatMoney(item.open)}</b></span>
       </div>
       <div class="card-actions">
@@ -2622,12 +2660,13 @@ function cardInvoiceRow(card) {
   const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
   const totalMonth = totals.month + paidTotal;
   const openAfterPayments = Math.max(0, totals.month - invoicePayments);
+  const paidDisplay = Math.min(totalMonth, invoicePayments + paidTotal);
   return `
     <div class="invoice-card">
       <div class="list-item">
         <div>
           <strong>${card.name}</strong>
-          <span>Fatura atual ${formatMoney(totalMonth)} · pago ${formatMoney(invoicePayments + paidTotal)} · falta ${formatMoney(openAfterPayments)} · vence dia ${card.dueDay || 10}</span>
+          <span>Fatura atual ${formatMoney(totalMonth)} · pago ${formatMoney(paidDisplay)} · falta ${formatMoney(openAfterPayments)} · vence dia ${card.dueDay || 10}</span>
         </div>
         <span class="card-actions">
           <button class="tiny ghost" data-card-detail="${card.name}">Detalhes</button>
@@ -2664,7 +2703,7 @@ function cardSummary(card) {
   const percent = Math.min(100, Math.round((totals.used / Math.max(card.limit, totals.used, 1)) * 100));
   return `<article class="credit-card ${card.color || "Azul"}">
     <div>
-      <span>Cartão de crédito</span>
+      <span>Cartão de crédito${card.owner ? ` · ${card.owner}` : ""}</span>
       <strong>${card.name}</strong>
     </div>
     <div class="card-chip"></div>
@@ -3233,6 +3272,7 @@ function addCard(event) {
   state.cards.push({
     id: crypto.randomUUID(),
     name: data.name,
+    owner: data.owner || appPeople()[0],
     limit: Number(data.limit || 0),
     closeDay: Number(data.closeDay || 20),
     dueDay: Number(data.dueDay || 10),
@@ -3247,9 +3287,11 @@ function editCard(id) {
   if (!item) return;
   modalMode = { kind: "card", id, fields: [
     { name: "name", label: "Nome", value: item.name },
+    { name: "owner", label: "Titular", type: "select", options: appPeople(), value: item.owner || appPeople()[0] },
     { name: "limit", label: "Limite", type: "number", step: "0.01", value: item.limit },
     { name: "closeDay", label: "Fecha dia", type: "number", step: "1", value: item.closeDay || 20 },
-    { name: "dueDay", label: "Vence dia", type: "number", step: "1", value: item.dueDay || 10 }
+    { name: "dueDay", label: "Vence dia", type: "number", step: "1", value: item.dueDay || 10 },
+    { name: "color", label: "Cor", type: "select", options: ["Azul", "Roxo", "Dourado", "Preto", "Verde"], value: item.color || "Azul" }
   ] };
   renderModal();
 }
@@ -3264,7 +3306,8 @@ function editInstallment(id) {
     { name: "category", label: "Categoria", type: "select", options: state.categoriesExpense, value: item.category },
     { name: "value", label: "Valor total", type: "number", step: "0.01", value: item.value },
     { name: "parts", label: "Parcelas", type: "number", step: "1", value: item.parts },
-    { name: "firstMonth", label: "Primeiro mês", type: "select", options: months, value: item.firstMonth }
+    { name: "firstMonth", label: "Primeiro mês", type: "select", options: months, value: item.firstMonth },
+    { name: "firstYear", label: "Ano da primeira fatura", type: "number", step: "1", value: item.firstYear || state.selectedYear }
   ] };
   renderModal();
 }
