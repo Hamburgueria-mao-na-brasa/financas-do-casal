@@ -58,6 +58,7 @@ let selectedInvoiceCard = "";
 let confirmAction = null;
 let currentActionOptions = [];
 let toastTimer = null;
+let lastLocalEditAt = 0;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const tutorialSteps = [
@@ -114,6 +115,7 @@ function ensureStateShape() {
   state.budgets ||= {};
   state.closedMonths ||= [];
   state.notificationMarks ||= {};
+  state.localVersion ||= 0;
   if (typeof state.onboardingDone !== "boolean") state.onboardingDone = false;
   if (typeof state.tutorialDone !== "boolean") state.tutorialDone = false;
   if (typeof state.privacyMode !== "boolean") state.privacyMode = false;
@@ -141,6 +143,8 @@ function saveState(sync = false) {
 }
 
 async function commitState() {
+  state.localVersion = Date.now();
+  lastLocalEditAt = state.localVersion;
   saveState(false);
   if (cloudReady && householdId) await saveCloudState();
   else showToast("Salvo neste aparelho", "success");
@@ -956,14 +960,9 @@ function saveEditModal(event) {
   if (data.kind === "installment") {
     const item = state.installments.find((installment) => installment.id === data.id);
     if (item) {
-      const purchaseDate = new Date(`${data.date}T00:00:00Z`);
-      const purchaseMonth = Number.isNaN(purchaseDate.getTime()) ? state.selectedMonth : months[purchaseDate.getUTCMonth()];
       const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
-      const dateOrCardChanged = data.date !== item.date || !sameCard(data.card, item.card);
-      const firstMonth = dateOrCardChanged || data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
-      const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
-      const inferredFirstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
-      const firstYear = dateOrCardChanged ? invoicePeriod.year : Number(data.firstYear || inferredFirstYear);
+      const firstMonth = invoicePeriod.month;
+      const firstYear = Number(invoicePeriod.year);
       Object.assign(item, {
         date: data.date,
         card: data.card,
@@ -1405,12 +1404,14 @@ function startCloudPolling() {
 
 async function refreshCloudState() {
   if (!cloudReady || !householdId || loadingCloud || savingCloud) return;
+  if (Date.now() - lastLocalEditAt < 10000) return;
   const { data, error } = await cloud
     .from("household_states")
     .select("data, updated_at")
     .eq("household_id", householdId)
     .single();
   if (error || !data?.updated_at || data.updated_at === lastCloudUpdatedAt) return;
+  if (Number(data.data?.localVersion || 0) < Number(state.localVersion || 0)) return;
   state = data.data;
   lastCloudUpdatedAt = data.updated_at;
   localStorage.setItem("coupleFinanceApp", JSON.stringify(state));
@@ -2040,7 +2041,6 @@ function renderEntries() {
       ${select("category", "Categoria", state.categoriesExpense, "", "Categoria da compra para relatórios.")}
       ${input("value", "Valor da compra", "number", "", "0.01", "Valor total, antes de dividir em parcelas.")}
       ${input("parts", "Parcelas", "number", "1", "1", "Quantidade de parcelas. Use 1 para compra à vista no cartão.")}
-      ${select("firstMonth", "Primeiro mês", months, state.selectedMonth, "Mês em que a primeira parcela entra na fatura.")}
       <button class="primary" type="submit">Salvar compra no cartão</button>
     </form>
     <div class="panel soft-panel">
@@ -2752,12 +2752,9 @@ function addInstallment(event) {
     setActiveView("cards");
     return;
   }
-  const purchaseMonth = months[new Date(`${data.date}T00:00:00Z`).getUTCMonth()];
-  const purchaseDate = new Date(`${data.date}T00:00:00Z`);
   const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
-  const firstMonth = data.firstMonth === purchaseMonth ? invoicePeriod.month : data.firstMonth;
-  const baseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
-  const firstYear = data.firstMonth === purchaseMonth ? invoicePeriod.year : baseYear + (monthIndex(firstMonth) < (Number.isNaN(purchaseDate.getTime()) ? monthIndex(state.selectedMonth) : purchaseDate.getUTCMonth()) ? 1 : 0);
+  const firstMonth = invoicePeriod.month;
+  const firstYear = Number(invoicePeriod.year);
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
@@ -3324,9 +3321,7 @@ function editInstallment(id) {
     { name: "description", label: "Descrição", value: item.description },
     { name: "category", label: "Categoria", type: "select", options: state.categoriesExpense, value: item.category },
     { name: "value", label: "Valor total", type: "number", step: "0.01", value: item.value },
-    { name: "parts", label: "Parcelas", type: "number", step: "1", value: item.parts },
-    { name: "firstMonth", label: "Primeiro mês", type: "select", options: months, value: item.firstMonth },
-    { name: "firstYear", label: "Ano da primeira fatura", type: "number", step: "1", value: item.firstYear || state.selectedYear }
+    { name: "parts", label: "Parcelas", type: "number", step: "1", value: item.parts }
   ] };
   renderModal();
 }
