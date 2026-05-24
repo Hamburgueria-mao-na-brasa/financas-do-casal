@@ -2145,8 +2145,6 @@ function renderEntries() {
       ]))}
     </div>
   `;
-  qs("#entry-form").addEventListener("submit", addEntry);
-  qs("#card-form").addEventListener("submit", addInstallment);
   const recurringButton = qs("#generate-recurring");
   if (recurringButton) recurringButton.addEventListener("click", generateRecurring);
   const cancel = qs("#cancel-edit");
@@ -3583,6 +3581,18 @@ function setActiveView(view) {
   document.body.dataset.view = view;
   renderViewContent(view);
 }
+
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  if (form.id === "entry-form") {
+    addEntry(event);
+    return;
+  }
+  if (form.id === "card-form") {
+    addInstallment(event);
+  }
+});
 
 document.addEventListener("click", async (event) => {
   if (
