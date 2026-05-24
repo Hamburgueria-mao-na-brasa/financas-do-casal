@@ -16,12 +16,14 @@ const seed = {
   cardRecurring: [],
   cardPayments: [],
   fixedBills: [],
+  methodIncome: 0,
   goals: [],
   notifications: [],
   profile: { personOne: "Ele", personTwo: "Ela", salaryOne: 0, salaryTwo: 0, salaryDayOne: 5, salaryDayTwo: 5 },
   onboardingDone: false,
   tutorialDone: false,
   privacyMode: false,
+  recurring: [],
   budgets: {},
   paidMonthsMigrated: false
 };
@@ -114,6 +116,7 @@ function ensureStateShape() {
   state.profile.salaryTwo ||= 0;
   state.profile.salaryDayOne = Number(state.profile.salaryDayOne || 5);
   state.profile.salaryDayTwo = Number(state.profile.salaryDayTwo || 5);
+  state.recurring ||= [];
   state.budgets ||= {};
   state.closedMonths ||= [];
   state.notificationMarks ||= {};
@@ -183,6 +186,12 @@ function dateInfo(dateValue) {
   return { month: months[date.getUTCMonth()], year: date.getUTCFullYear(), valid: true };
 }
 
+function moveViewToPeriod(month, year) {
+  if (!month || !months.includes(month)) return;
+  state.selectedMonth = month;
+  state.selectedYear = Number(year || state.selectedYear || new Date().getFullYear());
+}
+
 function isMonthClosed(month = state.selectedMonth, year = state.selectedYear) {
   return (state.closedMonths || []).includes(periodKey(month, year));
 }
@@ -224,6 +233,10 @@ function invoicePeriodForPurchase(dateValue, cardName) {
     month: months[invoiceDate.getUTCMonth()],
     year: invoiceDate.getUTCFullYear()
   };
+}
+
+function invoiceMonthForPurchase(dateValue, cardName) {
+  return invoicePeriodForPurchase(dateValue, cardName).month;
 }
 
 function cardKey(name) {
@@ -324,6 +337,16 @@ function availableSalaryTotal(month = state.selectedMonth, year = state.selected
   return one + two;
 }
 
+function nextSalaryText() {
+  const salaries = [
+    { name: state.profile.personOne || "Primeira pessoa", value: Number(state.profile.salaryOne || 0), day: Number(state.profile.salaryDayOne || 5) },
+    { name: state.profile.personTwo || "Segunda pessoa", value: Number(state.profile.salaryTwo || 0), day: Number(state.profile.salaryDayTwo || 5) }
+  ].filter((item) => item.value > 0 && !isSalaryAvailable(item.day));
+  if (!salaries.length) return "Salários disponíveis";
+  const next = salaries.sort((a, b) => a.day - b.day)[0];
+  return `${next.name}: dia ${next.day}`;
+}
+
 function currentSummary() {
   const entries = byMonth(state.entries);
   const income = total(entries.filter((item) => item.type === "Receita"));
@@ -389,6 +412,13 @@ function formatMoney(value) {
 
 function getInviteParam() {
   return new URLSearchParams(location.search).get("invite");
+}
+
+function getInviteLink() {
+  if (!householdInviteCode) return "";
+  const url = new URL(`${location.origin}${location.pathname}`);
+  url.searchParams.set("invite", householdInviteCode);
+  return url.toString();
 }
 
 function setAppReady(ready) {
@@ -1064,7 +1094,7 @@ function actionOption(label, icon, dataset) {
 }
 
 function optionButton(kind, id) {
-  return `<button class="tiny ghost" type="button" data-options-kind="${kind}" data-options-id="${id}">Opções</button>`;
+  return `<button class="tiny ghost" data-options-kind="${kind}" data-options-id="${id}">Opções</button>`;
 }
 
 function saveQuickEntry(event) {
@@ -1773,6 +1803,33 @@ function monthForecast(summary = currentSummary()) {
   };
 }
 
+function monthlyReport() {
+  const current = state.selectedMonth;
+  const currentIndex = monthIndex(current);
+  const previous = months[(currentIndex + 11) % 12];
+  const previousYear = Number(state.selectedYear) - (currentIndex === 0 ? 1 : 0);
+  const currentEntries = byMonth(state.entries, current, state.selectedYear);
+  const previousEntries = byMonth(state.entries, previous, previousYear);
+  const currentExpense = total(currentEntries.filter((item) => item.type === "Despesa"));
+  const previousExpense = total(previousEntries.filter((item) => item.type === "Despesa"));
+  const currentIncome = total(currentEntries.filter((item) => item.type === "Receita"));
+  const previousIncome = total(previousEntries.filter((item) => item.type === "Receita"));
+  const categoryTotals = currentEntries
+    .filter((item) => item.type === "Despesa")
+    .reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
+  const top = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ["", 0];
+  const expenseDiff = currentExpense - previousExpense;
+  const incomeDiff = currentIncome - previousIncome;
+  return {
+    expenseDiff,
+    incomeDiff,
+    expenseText: expenseDiff > 0 ? "Gastou mais que no mês anterior" : expenseDiff < 0 ? "Gastou menos que no mês anterior" : "Mesmo nível do mês anterior",
+    incomeText: incomeDiff > 0 ? "Entrou mais dinheiro" : incomeDiff < 0 ? "Entrou menos dinheiro" : "Mesma renda lançada",
+    topCategory: top[0],
+    topCategoryValue: top[1]
+  };
+}
+
 function fixedBillsWithDueInfo() {
   const now = new Date();
   const selectedIndex = monthIndex(state.selectedMonth);
@@ -1798,6 +1855,15 @@ function fixedBillsWithDueInfo() {
     const order = { overdue: 0, today: 1, soon: 2, normal: 3 };
     return order[a.priority] - order[b.priority] || a.dueDate - b.dueDate;
   });
+}
+
+function fixedAlertItem(item) {
+  return `
+    <div class="list-item due-item ${item.priority}">
+      <div><strong>${item.name}</strong><span>${item.dueText} · conta fixa</span></div>
+      <b>${formatMoney(item.value)}</b>
+    </div>
+  `;
 }
 
 function monthChartData(summary) {
@@ -1839,6 +1905,23 @@ function donutChart(items) {
   `;
 }
 
+function dashboardInsights(summary) {
+  const monthEntries = byMonth(state.entries);
+  const expenses = monthEntries.filter((item) => item.type === "Despesa");
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const todaySpent = total(expenses.filter((item) => item.date === todayKey));
+  const biggest = expenses.reduce((max, item) => Number(item.value || 0) > Number(max?.value || 0) ? item : max, null);
+  const categoryTotals = expenses.reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + Number(item.value || 0) }), {});
+  const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const daysLeft = Math.max(1, new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1);
+  return [
+    { label: "Gasto hoje", value: formatMoney(todaySpent), note: "Somente saídas do dia" },
+    { label: "Pode gastar por dia", value: formatMoney(Math.max(0, summary.balance) / daysLeft), note: `${daysLeft} dias restantes no mês` },
+    { label: "Maior gasto", value: biggest ? formatMoney(biggest.value) : formatMoney(0), note: biggest?.description || "Sem gastos no mês" },
+    { label: "Categoria destaque", value: topCategory ? formatMoney(topCategory[1]) : formatMoney(0), note: topCategory?.[0] || "Sem categoria" }
+  ];
+}
+
 function todaySummary() {
   const todayKey = new Date().toISOString().slice(0, 10);
   const todayEntries = state.entries.filter((item) => item.date === todayKey);
@@ -1850,6 +1933,16 @@ function todaySummary() {
     expense,
     dueToday: fixed.filter((item) => item.diffDays === 0).length,
     overdue: fixed.filter((item) => item.diffDays < 0).length
+  };
+}
+
+function fixedToPendingEntry(item) {
+  const date = new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+  return {
+    date,
+    category: item.category,
+    description: item.name,
+    value: item.value
   };
 }
 
@@ -1963,6 +2056,20 @@ function metric(label, value, tone, view = "") {
   return `<article class="metric ${tone} ${view ? "clickable" : ""}"${attr}><span>${label}</span><strong>${formatMoney(value)}</strong></article>`;
 }
 
+function statementItem(item) {
+  const isIncome = item.type === "Receita";
+  return `
+    <div class="statement-item">
+      <div class="statement-icon ${isIncome ? "income" : "expense"}">${isIncome ? "↓" : "↑"}</div>
+      <div>
+        <strong>${item.description || item.category}</strong>
+        <span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category}</span>
+      </div>
+      <b class="${isIncome ? "income" : "expense"}">${isIncome ? "+" : "-"}${formatMoney(item.value)}</b>
+    </div>
+  `;
+}
+
 function bar(label, value, max, color) {
   const width = Math.min(100, Math.round((value / max) * 100));
   return `<div class="bar-row"><span>${label}</span><div class="track"><div class="fill" style="--w:${width}%;--c:${color}"></div></div><strong>${formatMoney(value)}</strong></div>`;
@@ -1992,7 +2099,7 @@ function renderEntries() {
       </div>
     </section>
     <div class="entries-split">
-    <form class="entry-form guided-form" id="entry-form" novalidate>
+    <form class="entry-form guided-form" id="entry-form">
       <div class="span-3 form-heading"><span>${editing ? "✎" : "+"}</span><div><h2>${editing ? "Editar lançamento" : "Novo lançamento"}</h2><small>Use para Pix, débito, dinheiro e entradas avulsas.</small></div></div>
       <div class="mode-picker span-3" role="tablist" aria-label="Tipo de lançamento">
         <button class="${entryMode === "Receita" ? "active" : ""}" type="button" data-entry-mode="Receita">Entrada</button>
@@ -2010,7 +2117,7 @@ function renderEntries() {
       <button class="primary span-2" type="submit">${editing ? "Salvar alterações" : "Salvar lançamento"}</button>
       ${editing ? `<button class="ghost" id="cancel-edit" type="button">Cancelar edição</button>` : ""}
     </form>
-    <form class="entry-form guided-form" id="card-form" novalidate>
+    <form class="entry-form guided-form" id="card-form">
       <div class="span-3 form-heading"><span>▣</span><div><h2>Compra no cartão</h2><small>Lance a compra aqui. O app divide parcelas e joga na fatura do cartão.</small></div></div>
       ${select("card", "Cartão", cardOptions(), "", "Cartão onde a compra será lançada. Cadastre cartões na aba Cartões.")} 
       ${input("date", "Data da compra", "date", new Date().toISOString().slice(0, 10), "", "Dia em que você fez a compra.")}
@@ -2038,10 +2145,26 @@ function renderEntries() {
       ]))}
     </div>
   `;
+  qs("#entry-form").addEventListener("submit", addEntry);
+  qs("#card-form").addEventListener("submit", addInstallment);
+  const recurringButton = qs("#generate-recurring");
+  if (recurringButton) recurringButton.addEventListener("click", generateRecurring);
   const cancel = qs("#cancel-edit");
   if (cancel) cancel.addEventListener("click", () => {
     editingEntryId = null;
     renderEntries();
+  });
+  document.querySelectorAll("[data-entry-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      entryMode = button.dataset.entryMode;
+      renderEntries();
+    });
+  });
+  document.querySelectorAll("[data-entry-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      entryFilter = button.dataset.entryFilter;
+      renderEntries();
+    });
   });
 }
 
@@ -2055,33 +2178,56 @@ function filterEntries(entries) {
   });
 }
 
+function generateRecurring() {
+  const year = Number(state.selectedYear || new Date().getFullYear());
+  const month = monthIndex(state.selectedMonth);
+  const monthName = state.selectedMonth;
+  let created = 0;
+  state.recurring.forEach((item) => {
+    const date = new Date(year, month, Math.min(Number(item.day || 1), 28)).toISOString().slice(0, 10);
+    const exists = state.entries.some((entry) => {
+      const entryDate = new Date(`${entry.date}T00:00:00Z`);
+      return entry.recurringId === item.id && entry.month === monthName && entryDate.getUTCFullYear() === year;
+    });
+    if (exists) return;
+    state.entries.unshift({
+      id: crypto.randomUUID(),
+      recurringId: item.id,
+      date,
+      month: monthName,
+      type: item.type,
+      category: item.category,
+      description: item.description,
+      value: Number(item.value || 0),
+      person: item.person,
+      payment: item.type === "Receita" ? "Recebimento" : "Pix",
+      account: item.account || accountOptions()[0],
+      status: item.status || "Pendente",
+      notes: "Gerado automaticamente"
+    });
+    created += 1;
+  });
+  notify("sync", `${created} fixos gerados para ${monthName}/${year}`);
+  commitState();
+}
+
 function addEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  const value = Number(String(data.value || "").replace(",", "."));
-  if (!Number.isFinite(value) || value <= 0) {
-    showToast("Informe um valor maior que zero", "error");
-    return;
-  }
-  if (!data.date) {
-    showToast("Informe a data do lançamento", "error");
-    return;
-  }
   const entryDate = dateInfo(data.date);
-  const isIncome = entryMode === "Receita";
   const payload = {
     id: editingEntryId || crypto.randomUUID(),
     date: data.date,
     month: entryDate.month,
     type: entryMode,
-    category: data.category || (isIncome ? state.categoriesIncome[0] : state.categoriesExpense[0]) || (isIncome ? "Entrada" : "Saída"),
-    description: data.description || (isIncome ? "Entrada sem descrição" : "Saída sem descrição"),
-    value,
-    person: data.person || appPeople()[0],
+    category: data.category,
+    description: data.description,
+    value: Number(data.value || 0),
+    person: data.person,
     payment: data.payment || "Recebimento",
-    account: data.account || accountOptions()[0],
+    account: data.account,
     status: data.status || "Pago",
-    notes: data.notes || ""
+    notes: data.notes
   };
   if (editingEntryId) {
     state.entries = state.entries.map((item) => item.id === editingEntryId ? payload : item);
@@ -2264,6 +2410,10 @@ function statementDayGroup(date, items) {
 
 function fixedDateForMonth(item) {
   return new Date(Number(state.selectedYear || new Date().getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(item.dueDay || 1), 28)).toISOString().slice(0, 10);
+}
+
+function recurringCardDateForMonth(item) {
+  return cardRecurringItemsForInvoice(item.card).find((entry) => entry.installmentId === item.id)?.date || recurringChargeDate(item);
 }
 
 function cardPaymentRows(cardName = "") {
@@ -2648,6 +2798,42 @@ function cardRecurringRow(item) {
   `;
 }
 
+function cardInvoiceRow(card) {
+  const totals = cardTotals(card.name);
+  const monthItems = cardMonthItems(card.name);
+  const paidItems = monthItems.filter((item) => item.paid);
+  const openItems = monthItems.filter((item) => !item.paid);
+  const paidTotal = total(paidItems);
+  const invoicePayments = cardPaymentTotal(card.name);
+  const nextMonth = months[(monthIndex(state.selectedMonth) + 1) % 12];
+  const totalMonth = totals.month + paidTotal;
+  const openAfterPayments = Math.max(0, totals.month - invoicePayments);
+  const paidDisplay = Math.min(totalMonth, invoicePayments + paidTotal);
+  return `
+    <div class="invoice-card">
+      <div class="list-item">
+        <div>
+          <strong>${card.name}</strong>
+          <span>Fatura atual ${formatMoney(totalMonth)} · pago ${formatMoney(paidDisplay)} · falta ${formatMoney(openAfterPayments)} · vence dia ${card.dueDay || 10}</span>
+        </div>
+        <span class="card-actions">
+          <button class="tiny ghost" data-card-detail="${card.name}">Detalhes</button>
+          ${openItems.length ? `<button class="tiny ghost" data-partial-card-payment="${card.name}">Pagar fatura</button> <button class="tiny ghost" data-pay-card-month="${card.name}">Quitar</button>` : `<button class="tiny ghost" data-reopen-card-month="${card.name}">Reabrir</button>`}
+        </span>
+      </div>
+      <div class="invoice-items">
+        ${monthItems.length ? monthItems.map((item) => `
+          <span class="${item.paid ? "paid" : "open"}">
+            ${item.description} · ${item.partLabel} · ${item.category || "Sem categoria"} · ${item.paid ? "Pago" : "Aberto"}
+            <b>${formatMoney(item.value)}</b>
+            <small class="invoice-inline-actions">${invoiceItemActions(item)}</small>
+          </span>
+        `).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
+      </div>
+    </div>
+  `;
+}
+
 function cardMonthItems(cardName) {
   const installments = state.installments
     .filter((item) => sameCard(item.card, cardName))
@@ -2698,31 +2884,22 @@ function addInstallment(event) {
     setActiveView("cards");
     return;
   }
-  const value = Number(String(data.value || "").replace(",", "."));
-  if (!Number.isFinite(value) || value <= 0) {
-    showToast("Informe o valor da compra", "error");
-    return;
-  }
-  if (!data.date) {
-    showToast("Informe a data da compra", "error");
-    return;
-  }
   const invoicePeriod = invoicePeriodForPurchase(data.date, data.card);
   const firstMonth = invoicePeriod.month;
   const firstYear = Number(invoicePeriod.year);
   state.installments.unshift({
     id: crypto.randomUUID(),
     date: data.date,
-    card: data.card || state.cards[0].name,
-    description: data.description || "Compra no cartão",
-    category: data.category || state.categoriesExpense[0] || "Cartão",
-    value,
-    parts: Math.max(1, Number(data.parts || 1)),
+    card: data.card,
+    description: data.description,
+    category: data.category,
+    value: Number(data.value || 0),
+    parts: Number(data.parts || 1),
     firstMonth,
     firstYear,
     paidMonths: []
   });
-  notify("card", `Compra no cartão: ${data.description || data.card || "Compra"} · ${formatMoney(value)}`);
+  notify("card", `Compra no cartão: ${data.description || data.card} · ${formatMoney(Number(data.value || 0))}`);
   commitState();
 }
 
@@ -2833,6 +3010,42 @@ function editAccount(id) {
     { name: "initial", label: "Saldo inicial", type: "number", step: "0.01", value: item.initial }
   ] };
   renderModal();
+}
+
+function addIncome(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  const today = new Date();
+  const date = new Date(today.getFullYear(), today.getMonth(), Math.min(Number(data.day || today.getDate()), 28)).toISOString().slice(0, 10);
+  if (data.recurring === "Sim") {
+    state.recurring.push({
+      id: crypto.randomUUID(),
+      type: "Receita",
+      description: data.description,
+      value: Number(data.value || 0),
+      day: Number(data.day || 1),
+      category: data.category,
+      person: data.person,
+      account: data.account,
+      status: "Pago"
+    });
+  }
+  state.entries.unshift({
+    id: crypto.randomUUID(),
+    date,
+    month: months[today.getMonth()],
+    type: "Receita",
+    category: data.category,
+    description: data.description,
+    value: Number(data.value || 0),
+    person: data.person,
+    payment: "Recebimento",
+    account: data.account,
+    status: "Pago",
+    notes: data.recurring === "Sim" ? "Renda recorrente" : ""
+  });
+  notify("entry", `Renda adicionada: ${data.description} · ${formatMoney(Number(data.value || 0))}`);
+  commitState();
 }
 
 function renderMethod() {
@@ -3122,9 +3335,9 @@ function personAvatar(name, tone) {
 
 function categoryRow(item, kind) {
   return `
-    <div class="list-item category-row">
+    <div class="list-item">
       <strong>${item}</strong>
-      <span class="category-actions">
+      <span>
         <button class="tiny ghost" data-edit-category="${kind}|${item}">Editar</button>
         <button class="tiny danger" data-delete-category="${kind}|${item}">Excluir</button>
       </span>
@@ -3135,6 +3348,23 @@ function categoryRow(item, kind) {
 function budgetRowsHtml() {
   const rows = budgetWarnings(true);
   return rows.length ? rows.map((item) => bar(`${item.category} · ${item.percent}%`, item.spent, Math.max(item.limit, item.spent, 1), item.percent >= 100 ? "#f04438" : item.percent >= 80 ? "#ffb020" : "#00bf7a")).join("") : emptyHtml();
+}
+
+function addRecurring(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  state.recurring.push({
+    id: crypto.randomUUID(),
+    type: data.type,
+    description: data.description,
+    value: Number(data.value || 0),
+    day: Number(data.day || 1),
+    category: data.category,
+    person: data.person,
+    status: data.type === "Receita" ? "Pago" : "Pendente"
+  });
+  notify("sync", `Fixo cadastrado: ${data.description}`);
+  commitState();
 }
 
 function saveBudget(event) {
@@ -3292,6 +3522,11 @@ function select(name, label, options, selected = "", help = "") {
   return `<label class="field"><span>${labelWithHelp(label, help)}</span><select name="${name}">${options.map((option) => `<option ${option === selected ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
 }
 
+function categoryOptions(type) {
+  const categories = type === "Receita" ? state.categoriesIncome : state.categoriesExpense;
+  return categories.map((option) => `<option>${option}</option>`).join("");
+}
+
 function table(headers, rows) {
   if (!rows.length) return `<div class="table-wrap">${emptyHtml()}</div>`;
   return `<div class="table-wrap"><table><thead><tr>${headers.map((header) => `<th>${header}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => String(cell).startsWith("<td") ? cell : `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -3342,18 +3577,6 @@ function setActiveView(view) {
   renderViewContent(view);
 }
 
-document.addEventListener("submit", (event) => {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement)) return;
-  if (form.id === "entry-form") {
-    addEntry(event);
-    return;
-  }
-  if (form.id === "card-form") {
-    addInstallment(event);
-  }
-});
-
 document.addEventListener("click", async (event) => {
   if (
     notificationsOpen &&
@@ -3368,20 +3591,6 @@ document.addEventListener("click", async (event) => {
   if (tab) {
     if (tab.dataset.setupWallet) walletTab = tab.dataset.setupWallet;
     setActiveView(tab.dataset.view);
-  }
-
-  const entryModeButton = event.target.closest("[data-entry-mode]");
-  if (entryModeButton) {
-    entryMode = entryModeButton.dataset.entryMode;
-    renderEntries();
-    return;
-  }
-
-  const entryFilterButton = event.target.closest("[data-entry-filter]");
-  if (entryFilterButton) {
-    entryFilter = entryFilterButton.dataset.entryFilter;
-    renderEntries();
-    return;
   }
 
   const notificationButton = event.target.closest("[data-notification-id]");
