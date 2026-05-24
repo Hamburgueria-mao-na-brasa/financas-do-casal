@@ -50,6 +50,7 @@ let entryFilter = "Todos";
 let statementFilter = "Todos";
 let statementCardFilter = "Todos";
 let statementSearch = "";
+let selectedInvoiceCard = "";
 let confirmAction = null;
 let toastTimer = null;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -149,22 +150,42 @@ function getInstallmentSchedule(item) {
   const perPart = Number(item.value || 0) / Number(item.parts || 1);
   const purchaseDate = new Date(`${item.date || ""}T00:00:00Z`);
   const purchaseYear = Number.isNaN(purchaseDate.getTime()) ? Number(state.selectedYear || new Date().getFullYear()) : purchaseDate.getUTCFullYear();
+  const purchaseDay = Number.isNaN(purchaseDate.getTime()) ? 1 : purchaseDate.getUTCDate();
   const firstYear = Number(item.firstYear || purchaseYear);
-  return Array.from({ length: Number(item.parts || 1) }, (_, index) => ({
-    month: months[(start + index) % 12],
-    year: firstYear + Math.floor((start + index) / 12),
-    value: perPart,
-    paid: isPeriodPaid(item, months[(start + index) % 12], firstYear + Math.floor((start + index) / 12))
-  }));
+  return Array.from({ length: Number(item.parts || 1) }, (_, index) => {
+    const month = months[(start + index) % 12];
+    const year = firstYear + Math.floor((start + index) / 12);
+    const date = installmentDateForPeriod(purchaseDay, month, year);
+    return {
+      month,
+      year,
+      date,
+      value: perPart,
+      paid: isPeriodPaid(item, month, year)
+    };
+  });
+}
+
+function installmentDateForPeriod(day, month, year) {
+  const monthNumber = monthIndex(month);
+  const lastDay = new Date(Number(year), monthNumber + 1, 0).getDate();
+  return new Date(Date.UTC(Number(year), monthNumber, Math.min(Number(day || 1), lastDay))).toISOString().slice(0, 10);
+}
+
+function invoicePeriodForPurchase(dateValue, cardName) {
+  const card = state.cards.find((item) => sameCard(item.name, cardName));
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return { month: state.selectedMonth, year: Number(state.selectedYear) };
+  const closeDay = Number(card?.closeDay || 20);
+  const invoiceDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + (date.getUTCDate() > closeDay ? 1 : 0), 1));
+  return {
+    month: months[invoiceDate.getUTCMonth()],
+    year: invoiceDate.getUTCFullYear()
+  };
 }
 
 function invoiceMonthForPurchase(dateValue, cardName) {
-  const card = state.cards.find((item) => sameCard(item.name, cardName));
-  const date = new Date(`${dateValue}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return state.selectedMonth;
-  const purchaseMonth = months[date.getUTCMonth()];
-  const closeDay = Number(card?.closeDay || 20);
-  return date.getUTCDate() > closeDay ? months[(date.getUTCMonth() + 1) % 12] : purchaseMonth;
+  return invoicePeriodForPurchase(dateValue, cardName).month;
 }
 
 function cardKey(name) {
@@ -182,12 +203,8 @@ function cardTotals(cardName) {
   const scheduled = state.installments
     .filter((item) => sameCard(item.card, cardName))
     .flatMap(getInstallmentSchedule);
-  const recurring = state.cardRecurring
-    .filter((item) => sameCard(item.card, cardName) && item.active !== false)
-    .map((item) => ({ month: state.selectedMonth, value: Number(item.value || 0), paid: isPeriodPaid(item) }));
-  const recurringNext = state.cardRecurring
-    .filter((item) => sameCard(item.card, cardName) && item.active !== false && !isPeriodPaid(item, nextMonth, nextYear))
-    .map((item) => ({ value: Number(item.value || 0) }));
+  const recurring = cardRecurringItemsForInvoice(cardName);
+  const recurringNext = cardRecurringItemsForInvoice(cardName, nextMonth, nextYear).filter((item) => !item.paid);
   const open = scheduled.filter((part) => !part.paid);
   const recurringOpen = recurring.filter((part) => !part.paid);
   const monthOpen = [
@@ -199,6 +216,40 @@ function cardTotals(cardName) {
     month: total(monthOpen),
     next: total(open.filter((part) => part.month === nextMonth && Number(part.year) === Number(nextYear))) + total(recurringNext)
   };
+}
+
+function cardRecurringItemsForInvoice(cardName = "", invoiceMonth = state.selectedMonth, invoiceYear = state.selectedYear) {
+  const invoiceMonthIndex = monthIndex(invoiceMonth);
+  const invoiceYearNumber = Number(invoiceYear || new Date().getFullYear());
+  const candidatePeriods = [
+    { monthIndex: invoiceMonthIndex, year: invoiceYearNumber },
+    { monthIndex: (invoiceMonthIndex + 11) % 12, year: invoiceYearNumber - (invoiceMonthIndex === 0 ? 1 : 0) }
+  ];
+  return (state.cardRecurring || [])
+    .filter((item) => (!cardName || sameCard(item.card, cardName)) && item.active !== false)
+    .flatMap((item) => candidatePeriods.map((period) => {
+      const chargeDate = recurringChargeDate(item, period.monthIndex, period.year);
+      const invoice = invoicePeriodForPurchase(chargeDate, item.card);
+      if (invoice.month !== invoiceMonth || Number(invoice.year) !== invoiceYearNumber) return null;
+      return {
+        month: invoiceMonth,
+        year: invoiceYearNumber,
+        date: chargeDate,
+        value: Number(item.value || 0),
+        paid: isPeriodPaid(item, invoiceMonth, invoiceYearNumber),
+        installmentId: item.id,
+        description: item.description,
+        category: item.category,
+        card: item.card,
+        partLabel: "fixo mensal"
+      };
+    }))
+    .filter(Boolean);
+}
+
+function recurringChargeDate(item, chargeMonthIndex = monthIndex(state.selectedMonth), chargeYear = state.selectedYear) {
+  const lastDay = new Date(Number(chargeYear), chargeMonthIndex + 1, 0).getDate();
+  return new Date(Date.UTC(Number(chargeYear), chargeMonthIndex, Math.min(Number(item.day || 1), lastDay))).toISOString().slice(0, 10);
 }
 
 function isFixedPaid(item, month = state.selectedMonth, year = state.selectedYear) {
@@ -605,6 +656,11 @@ function ensureSmartNotifications() {
     if (Number(card.limit || 0) && totals.used >= Number(card.limit || 0) * 0.8) {
       smartNotify(`card-limit-${card.id}`, "card", `${card.name} já usou 80% do limite`, "cards");
     }
+    const now = new Date();
+    const dueDate = new Date(Number(state.selectedYear || now.getFullYear()), monthIndex(state.selectedMonth), Math.min(Number(card.dueDay || 10), 28));
+    const diffDays = Math.round((dueDate - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+    if (totals.month > 0 && diffDays === 3) smartNotify(`card-due-${card.id}-3`, "card", `Fatura ${card.name} vence em 3 dias`, "cards");
+    if (totals.month > 0 && diffDays === 0) smartNotify(`card-due-${card.id}-0`, "card", `Fatura ${card.name} vence hoje`, "cards");
   });
   state.goals.forEach((goal) => {
     if (Number(goal.target || 0) && Number(goal.saved || 0) >= Number(goal.target || 0)) {
@@ -1373,6 +1429,10 @@ function renderDashboard() {
     </div>
     ${dashboardInvoicesHtml()}
     <div class="grid-2">
+      ${dashboardForecastHtml(summary)}
+      ${dashboardPeopleHtml()}
+    </div>
+    <div class="grid-2">
       <div class="panel dashboard-priority">
         <div class="section-title">
           <span>!</span>
@@ -1385,6 +1445,42 @@ function renderDashboard() {
       <div class="panel dashboard-chart">
         <h2>Gráfico do mês</h2>
         ${donutChart(chartData)}
+      </div>
+    </div>
+  `;
+}
+
+function dashboardForecastHtml(summary = currentSummary()) {
+  const openInvoices = total(state.cards.map((card) => ({ value: cardStatementSummary(card).open })));
+  const fixedPending = summary.fixedPending;
+  const projected = summary.balance - fixedPending - openInvoices;
+  return `
+    <div class="panel dashboard-forecast">
+      <div class="section-title"><span>↯</span><div><h2>Previsão do mês</h2><small>Se pagar o que ainda está aberto.</small></div></div>
+      <div class="forecast-grid">
+        <div><span>Saldo agora</span><strong>${formatMoney(summary.balance)}</strong></div>
+        <div><span>Faturas abertas</span><strong>${formatMoney(openInvoices)}</strong></div>
+        <div><span>Fixos pendentes</span><strong>${formatMoney(fixedPending)}</strong></div>
+        <div><span>Depois de pagar</span><strong>${formatMoney(projected)}</strong></div>
+      </div>
+    </div>
+  `;
+}
+
+function dashboardPeopleHtml() {
+  const people = appPeople();
+  const rows = people.map((person) => {
+    const entries = byMonth(state.entries).filter((item) => item.person === person);
+    const income = total(entries.filter((item) => item.type === "Receita"));
+    const expense = total(entries.filter((item) => item.type === "Despesa"));
+    const fixed = total((state.fixedBills || []).filter((item) => item.person === person && isFixedPaid(item)));
+    return { person, income, expense: expense + fixed, balance: income - expense - fixed };
+  });
+  return `
+    <div class="panel dashboard-people">
+      <div class="section-title"><span>◎</span><div><h2>Resumo por pessoa</h2><small>Entradas, saídas e fixos pagos no mês.</small></div></div>
+      <div class="list">
+        ${rows.map((row) => `<div class="list-item"><div><strong>${row.person}</strong><span>Entradas ${formatMoney(row.income)} · Saídas ${formatMoney(row.expense)}</span></div><b>${formatMoney(row.balance)}</b></div>`).join("")}
       </div>
     </div>
   `;
@@ -1418,7 +1514,7 @@ function dashboardInvoiceCard({ card, summary }) {
         <small>Atual ${formatMoney(summary.invoiceTotal)} · vence dia ${card.dueDay || 10}</small>
       </div>
       <div class="card-actions">
-        <button class="tiny ghost" type="button" data-view="cards">Ver</button>
+        <button class="tiny ghost" type="button" data-card-detail="${card.name}">Ver</button>
         ${open > 0 ? `<button class="tiny ghost" type="button" data-partial-card-payment="${card.name}">Pagar parcial</button><button class="tiny ghost" type="button" data-pay-card-month="${card.name}">Quitar</button>` : `<button class="tiny ghost" type="button" data-reopen-card-month="${card.name}">Reabrir</button>`}
       </div>
     </article>
@@ -1999,22 +2095,22 @@ function renderStatement() {
       .map((part, index) => ({
         id: `${item.id}-${index}`,
         kind: "Cartão",
-        date: item.date,
+        date: part.date,
         title: item.description,
         detail: `${item.card} · parcela ${index + 1}/${item.parts} · ${part.paid ? "Pago" : "Aberto"}`,
         value: Number(part.value || 0),
         tone: "card",
         action: `<button class="tiny ghost" data-toggle-card-part="${item.id}|${part.month}|${part.year}">${part.paid ? "Reabrir parcela" : "Marcar pago"}</button> <button class="tiny danger" data-delete-installment="${item.id}">Excluir compra</button>`
       }))),
-    ...state.cardRecurring.filter((item) => item.active !== false).map((item) => ({
+    ...cardRecurringItemsForInvoice().map((item) => ({
       id: item.id,
       kind: "Cartão",
-      date: recurringCardDateForMonth(item),
+      date: item.date,
       title: item.description,
-      detail: `${item.card} · cobrança fixa · ${isPeriodPaid(item) ? "Pago" : "Aberto"}`,
+      detail: `${item.card} · cobrança fixa · ${item.paid ? "Pago" : "Aberto"}`,
       value: Number(item.value || 0),
       tone: "card",
-      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${isPeriodPaid(item) ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
+      action: `<button class="tiny ghost" data-toggle-card-recurring="${item.id}">${item.paid ? "Reabrir" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-card-recurring="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-recurring="${item.id}">Excluir</button>`
     })),
     ...cardPaymentRows().map((item) => ({
       id: item.id,
@@ -2382,8 +2478,49 @@ function renderCards() {
         ${state.cards.length ? state.cards.map(cardInvoiceRow).join("") : emptyHtml()}
       </div>
     </div>
+    ${cardDetailHtml()}
   `;
   qs("#card-settings-form").addEventListener("submit", addCard);
+}
+
+function cardDetailHtml() {
+  const card = state.cards.find((item) => sameCard(item.name, selectedInvoiceCard)) || state.cards[0];
+  if (!card) return "";
+  const items = cardMonthItems(card.name);
+  const payments = cardPaymentRows(card.name);
+  const summary = cardStatementSummary(card);
+  return `
+    <div class="panel soft-panel card-detail-panel" id="card-detail-panel">
+      <div class="section-title"><span>▣</span><div><h2>Detalhe da fatura: ${card.name}</h2><small>Total ${formatMoney(summary.invoiceTotal)} · pago ${formatMoney(summary.paidItems + summary.payments)} · aberto ${formatMoney(summary.open)}</small></div></div>
+      <label class="field statement-card-select">
+        <span>Ver cartão</span>
+        <select id="invoice-card-detail-select">
+          ${state.cards.map((item) => `<option ${sameCard(item.name, card.name) ? "selected" : ""}>${item.name}</option>`).join("")}
+        </select>
+      </label>
+      <div class="grid-2">
+        <div class="list">
+          <h2>Itens da fatura</h2>
+          ${items.length ? items.map((item) => `
+            <div class="list-item ${item.paid ? "paid" : "pending"}">
+              <div><strong>${item.description}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category || "Sem categoria"} · ${item.partLabel} · ${item.paid ? "Pago" : "Aberto"}</span></div>
+              <b>${formatMoney(item.value)}</b>
+            </div>
+          `).join("") : emptyHtml()}
+        </div>
+        <div class="list">
+          <h2>Pagamentos da fatura</h2>
+          ${payments.length ? payments.map((item) => `
+            <div class="list-item">
+              <div><strong>${item.description}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.month}/${item.year}</span></div>
+              <b>${formatMoney(item.value)}</b>
+              <span class="card-actions"><button class="tiny ghost" data-edit-card-payment="${item.id}">Editar</button><button class="tiny danger" data-delete-card-payment="${item.id}">Excluir</button></span>
+            </div>
+          `).join("") : emptyHtml()}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function cardRecurringRow(item) {
@@ -2443,6 +2580,8 @@ function cardMonthItems(cardName) {
     .filter((item) => sameCard(item.card, cardName) && item.active !== false)
     .map((item) => ({
       month: state.selectedMonth,
+      year: Number(state.selectedYear),
+      date: recurringCardDateForMonth(item),
       value: Number(item.value || 0),
       paid: isPeriodPaid(item),
       installmentId: item.id,
@@ -2825,9 +2964,10 @@ function renderSettings() {
       </div>
       <div class="panel">
         <h2>Backup</h2>
+        <p class="mini-status">Último backup: ${localStorage.getItem("duofinLastBackup") || "ainda não exportado"}</p>
         <div class="list">
           <button class="ghost" id="export-data" type="button">Exportar dados</button>
-          <label class="field"><span>Importar backup</span><input id="import-data" type="file" accept="application/json"></label>
+          <label class="field"><span>Importar backup com cuidado</span><input id="import-data" type="file" accept="application/json"></label>
         </div>
       </div>
       <div class="panel">
@@ -2950,11 +3090,17 @@ function exportData() {
   a.download = `financas-do-casal-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  localStorage.setItem("duofinLastBackup", new Date().toLocaleString("pt-BR"));
+  showToast("Backup exportado", "success");
 }
 
 function importData(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  if (!confirm("Importar backup substitui os dados atuais deste cofre. Continuar?")) {
+    event.target.value = "";
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
