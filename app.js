@@ -237,6 +237,7 @@ function cardRecurringItemsForInvoice(cardName = "", invoiceMonth = state.select
         date: chargeDate,
         value: Number(item.value || 0),
         paid: isPeriodPaid(item, invoiceMonth, invoiceYearNumber),
+        source: "recurring",
         installmentId: item.id,
         description: item.description,
         category: item.category,
@@ -2128,7 +2129,7 @@ function renderStatement() {
       value: Number(item.value || 0),
       tone: "card-payment",
       card: item.card,
-      action: `<button class="tiny danger" data-delete-card-payment="${item.id}">Excluir pagamento</button>`
+      action: `<button class="tiny ghost" data-edit-card-payment="${item.id}">Editar</button> <button class="tiny danger" data-delete-card-payment="${item.id}">Excluir pagamento</button>`
     })),
     ...(state.fixedBills || []).map((item) => ({
       id: item.id,
@@ -2138,7 +2139,7 @@ function renderStatement() {
       detail: `${item.category} · ${item.person} · ${isFixedPaid(item) ? "Pago" : "Pendente"}`,
       value: Number(item.value || 0),
       tone: isFixedPaid(item) ? "fixed-paid" : "fixed-pending",
-      action: `<button class="tiny ghost" data-toggle-fixed="${item.id}">${isFixedPaid(item) ? "Marcar pendente" : "Marcar pago"}</button>`
+      action: `<button class="tiny ghost" data-toggle-fixed="${item.id}">${isFixedPaid(item) ? "Marcar pendente" : "Marcar pago"}</button> <button class="tiny ghost" data-edit-fixed="${item.id}">Editar</button>`
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
   const query = statementSearch.trim().toLowerCase();
@@ -2517,6 +2518,7 @@ function cardDetailHtml() {
             <div class="list-item ${item.paid ? "paid" : "pending"}">
               <div><strong>${item.description}</strong><span>${dateFmt.format(new Date(`${item.date}T00:00:00Z`))} · ${item.category || "Sem categoria"} · ${item.partLabel} · ${item.paid ? "Pago" : "Aberto"}</span></div>
               <b>${formatMoney(item.value)}</b>
+              <span class="card-actions">${invoiceItemActions(item)}</span>
             </div>
           `).join("") : emptyHtml()}
         </div>
@@ -2533,6 +2535,13 @@ function cardDetailHtml() {
       </div>
     </div>
   `;
+}
+
+function invoiceItemActions(item) {
+  if (item.source === "recurring") {
+    return `<button class="tiny ghost" data-toggle-card-recurring="${item.installmentId}">${item.paid ? "Reabrir" : "Marcar pago"}</button><button class="tiny ghost" data-edit-card-recurring="${item.installmentId}">Editar</button>`;
+  }
+  return `<button class="tiny ghost" data-toggle-card-part="${item.installmentId}|${item.month}|${item.year}">${item.paid ? "Reabrir" : "Marcar pago"}</button><button class="tiny ghost" data-edit-installment="${item.installmentId}">Editar</button>`;
 }
 
 function cardRecurringRow(item) {
@@ -2576,6 +2585,7 @@ function cardInvoiceRow(card) {
           <span class="${item.paid ? "paid" : "open"}">
             ${item.description} · ${item.partLabel} · ${item.category || "Sem categoria"} · ${item.paid ? "Pago" : "Aberto"}
             <b>${formatMoney(item.value)}</b>
+            <small class="invoice-inline-actions">${invoiceItemActions(item)}</small>
           </span>
         `).join("") : `<small>Nenhuma compra nesta fatura.</small>`}
       </div>
@@ -2586,7 +2596,7 @@ function cardInvoiceRow(card) {
 function cardMonthItems(cardName) {
   const installments = state.installments
     .filter((item) => sameCard(item.card, cardName))
-    .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
+    .flatMap((item) => getInstallmentSchedule(item).map((part, index) => ({ ...part, source: "installment", installmentId: item.id, description: item.description, category: item.category, partLabel: `${index + 1}/${item.parts}` })))
     .filter((part) => part.month === state.selectedMonth && Number(part.year) === Number(state.selectedYear));
   const recurring = state.cardRecurring
     ? cardRecurringItemsForInvoice(cardName)

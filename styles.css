@@ -1559,12 +1559,21 @@ h2 {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fbfffd;
   color: var(--muted);
   font-size: 13px;
+}
+
+.invoice-inline-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex: 1 1 100%;
 }
 
 .invoice-items span.paid {
