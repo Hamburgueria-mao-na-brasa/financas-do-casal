@@ -423,13 +423,36 @@ async function loadWorkspace() {
     await ensureHousehold();
     const { data, error } = await cloud.from("household_states").select("data").eq("household_id", householdId).maybeSingle();
     if (error) throw error;
-    state = normalizeState(data?.data || {});
+    const remoteData = data?.data || {};
+    const localData = readLocalBackup();
+    state = normalizeState(shouldUseLocalBackup(remoteData, localData) ? localData : remoteData);
     cloudReady = true;
     render();
+    if (shouldUseLocalBackup(remoteData, localData)) {
+      showToast("Recuperei dados salvos neste aparelho. Confira antes de lançar novos itens.");
+    }
   } catch (error) {
     console.error(error);
     renderAuth(`Erro ao carregar seus dados: ${error.message || error}`);
   }
+}
+
+function readLocalBackup() {
+  try {
+    return JSON.parse(localStorage.getItem("coupleFinanceApp") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function dataCount(data) {
+  if (!data || typeof data !== "object") return 0;
+  return ["cards", "entries", "installments", "fixedBills", "cardRecurring", "accounts", "goals"]
+    .reduce((sum, key) => sum + (Array.isArray(data[key]) ? data[key].length : 0), 0);
+}
+
+function shouldUseLocalBackup(remoteData, localData) {
+  return dataCount(remoteData) === 0 && dataCount(localData) > 0;
 }
 
 async function ensureHousehold() {
@@ -892,6 +915,7 @@ function addGoal(form) {
 }
 
 function renderSettings() {
+  const localBackup = readLocalBackup();
   $("#settings").innerHTML = html`
     <section class="feature-hero"><div><span>Conta</span><h2>Configurações</h2><p>Perfil, convite e acesso.</p></div></section>
     <form class="entry-form guided-form" id="profile-form">
@@ -908,6 +932,13 @@ function renderSettings() {
       <p>Código do cofre: <strong>${householdInviteCode || "carregando..."}</strong></p>
       <form id="join-form" class="mini-form">${input("code", "Entrar com código", "text", "", "autocomplete=\"off\"")}<button class="primary" type="submit">Conectar</button></form>
       <button class="danger" type="button" data-signout>Sair da conta</button>
+    </section>
+    <section class="panel">
+      <h2>Diagnóstico dos dados</h2>
+      <div class="list-item"><div><strong>Cofre atual</strong><span>${householdId || "não carregado"}</span></div><b>${householdInviteCode || "-"}</b></div>
+      <div class="list-item"><div><strong>Dados carregados</strong><span>Cartões ${state.cards.length} · Lançamentos ${state.entries.length} · Compras cartão ${state.installments.length} · Fixos ${state.fixedBills.length}</span></div><b>${dataCount(state)}</b></div>
+      <div class="list-item"><div><strong>Backup neste aparelho</strong><span>Itens encontrados no navegador atual.</span></div><b>${dataCount(localBackup)}</b></div>
+      ${dataCount(localBackup) > dataCount(state) ? `<button class="ghost" type="button" data-restore-local>Restaurar backup deste aparelho</button>` : ""}
     </section>
   `;
 }
@@ -1018,6 +1049,15 @@ async function handleClick(event) {
     householdId = "";
     currentUser = null;
     renderAuth();
+  }
+  if (event.target.closest("[data-restore-local]")) {
+    const localData = readLocalBackup();
+    if (!dataCount(localData)) return showToast("Nenhum backup local encontrado", "error");
+    if (!confirm("Restaurar o backup deste aparelho para o cofre atual?")) return;
+    state = normalizeState(localData);
+    await saveNow(false);
+    render();
+    showToast("Backup local restaurado");
   }
 }
 
