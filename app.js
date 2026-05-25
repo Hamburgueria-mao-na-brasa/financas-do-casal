@@ -56,7 +56,9 @@ function hasFinancialData(data) {
 }
 
 function readLocalBackup() {
-  const keys = [localStateKey(), "duofinV2Local"].filter(Boolean);
+  if (!householdId) return null;
+
+  const keys = [localStateKey()].filter(Boolean);
 
   for (const key of keys) {
     try {
@@ -598,15 +600,13 @@ async function loadApp() {
 
     await ensureHousehold();
 
-    const { data, error } = await db
-      .from("duofin_v2_states")
-      .select("data")
-      .eq("household_id", householdId)
-      .maybeSingle();
+    const { data, error } = await db.rpc("duofin_v2_get_state", {
+      target_household: householdId
+    });
 
     if (error) throw error;
 
-    state = normalize(data?.data || {});
+    state = normalize(data || {});
 
     const localBackup = readLocalBackup();
 
@@ -926,18 +926,24 @@ function monthSalary() {
 
 function summary() {
   const entries = currentEntries();
+  const plannedIncome = Number(state.profile.salaryOne || 0) + Number(state.profile.salaryTwo || 0);
   const income = total(entries.filter((entry) => entry.type === "income")) + monthSalary();
   const expense = total(entries.filter((entry) => entry.type === "expense" && entry.status === "paid"));
   const cards = total(state.cards.map((card) => ({ value: cardInvoice(card.name).amount })));
   const cardsForBalance = total(state.cards.filter(cardAffectsBalance).map((card) => ({ value: cardInvoice(card.name).open })));
   const fixedPaid = total(state.fixedBills.filter((bill) => fixedIsPaid(bill)));
+  const fixedPending = total(state.fixedBills.filter((bill) => bill.active !== false && !fixedIsPaid(bill)));
+  const goalsSaved = total(state.goals.map((goal) => ({ value: goal.saved || goal.current || 0 })));
 
   return {
+    plannedIncome,
     income,
     expense,
     cards,
     cardsForBalance,
     fixedPaid,
+    fixedPending,
+    goalsSaved,
     balance: income - expense - cardsForBalance - fixedPaid
   };
 }
@@ -1058,6 +1064,18 @@ function renderHome() {
       ${metric("Saidas", data.expense + data.fixedPaid, "statement")}
       ${metric("Cartoes", data.cards, "cards")}
       ${metric("Saldo", data.balance, "statement")}
+    </section>
+
+    <section class="panel wide">
+      <div class="section-head">
+        <span>Raio-x rapido</span>
+        <h2>Resumo inteligente</h2>
+      </div>
+      ${moneyRow("Renda cadastrada", "Salarios do casal no mes", data.plannedIncome)}
+      ${moneyRow("Fixas pagas", "Contas marcadas como pagas", data.fixedPaid)}
+      ${moneyRow("Fixas pendentes", "Ainda falta pagar neste mes", data.fixedPending)}
+      ${moneyRow("Faturas abertas", "Cartoes que ainda precisam de atencao", total(invoices.map((item) => ({ value: item.invoice.open }))))}
+      ${moneyRow("Guardado em metas", "Total informado nas metas", data.goalsSaved)}
     </section>
 
     ${
@@ -1310,6 +1328,7 @@ function renderCards() {
 function cardHtml(card) {
   const invoice = cardInvoice(card.name);
   const used = cardUsedLimit(card.name);
+  const payments = cardPayments(card.name);
 
   return `
     <article class="credit-card">
@@ -1345,11 +1364,28 @@ function cardHtml(card) {
             <i>${item.description} - ${item.source === "purchase" ? `${item.part}/${item.parts}` : "fixo"}</i>
             <b>${brl(item.value)}</b>
             ${item.source === "purchase" ? `<button class="tiny ghost" data-edit-purchase="${item.id}" type="button">Editar</button>` : ""}
+            ${item.source === "purchase" ? `<button class="tiny danger" data-delete-purchase="${item.id}" type="button">Excluir</button>` : ""}
+            ${item.source === "fixed-card" ? `<button class="tiny ghost" data-edit-card-fixed="${item.id}" type="button">Editar fixo</button>` : ""}
           </span>
         `
                 )
                 .join("")
             : `<span>Nenhuma compra nesta fatura.</span>`
+        }
+        ${
+          payments.length
+            ? payments
+                .map(
+                  (payment) => `
+          <span>
+            <i>Pagamento/adiantamento - ${dateFmt.format(new Date(`${payment.date}T00:00:00Z`))}</i>
+            <b>${brl(payment.value)}</b>
+            <button class="tiny danger" data-delete-card-payment="${payment.id}" type="button">Excluir pagamento</button>
+          </span>
+        `
+                )
+                .join("")
+            : ""
         }
       </div>
     </article>
@@ -1362,6 +1398,12 @@ function addCard(form) {
 
   if (!data.name || !Number.isFinite(limit)) {
     return toast("Preencha os dados do cartao.");
+  }
+
+  const duplicate = state.cards.some((card) => card.id !== editingCardId && same(card.name, data.name));
+
+  if (duplicate) {
+    return toast("Ja existe um cartao com esse nome.");
   }
 
   const nextCard = {
@@ -1446,7 +1488,7 @@ function renderFixed() {
                   bill.description,
                   `${bill.category} - vence dia ${bill.dueDay} - ${fixedIsPaid(bill) ? "Pago" : "Pendente"}`,
                   bill.value,
-                  `<button class="tiny ghost" data-edit-fixed="${bill.id}">Editar</button><button class="tiny ghost" data-toggle-fixed="${bill.id}">${fixedIsPaid(bill) ? "Reabrir" : "Pago"}</button>`
+                  `<button class="tiny ghost" data-edit-fixed="${bill.id}">Editar</button><button class="tiny ghost" data-toggle-fixed="${bill.id}">${fixedIsPaid(bill) ? "Reabrir" : "Pago"}</button><button class="tiny danger" data-delete-fixed="${bill.id}">Excluir</button>`
                 )
               )
               .join("")
@@ -1456,7 +1498,7 @@ function renderFixed() {
       ${
         state.cardFixedBills.length
           ? `<h2>Fixos no cartao</h2>${state.cardFixedBills
-              .map((bill) => row(bill.description, `${bill.card} - dia ${bill.chargeDay}`, bill.value, `<button class="tiny ghost" data-edit-card-fixed="${bill.id}">Editar</button>`))
+              .map((bill) => row(bill.description, `${bill.card} - dia ${bill.chargeDay}`, bill.value, `<button class="tiny ghost" data-edit-card-fixed="${bill.id}">Editar</button><button class="tiny danger" data-delete-card-fixed="${bill.id}">Excluir</button>`))
               .join("")}`
           : ""
       }
@@ -1544,6 +1586,14 @@ function renderStatement() {
         detail: `Cartao - ${card.name}`
       }))
     ),
+    ...state.cardPayments
+      .filter((payment) => payment.month === state.selectedMonth && Number(payment.year) === Number(state.selectedYear))
+      .map((payment) => ({
+        ...payment,
+        source: "card-payment",
+        title: `Pagamento ${payment.card}`,
+        detail: "Fatura do cartao"
+      })),
     ...state.fixedBills.map((bill) => ({
       ...bill,
       source: "fixed",
@@ -1570,11 +1620,19 @@ function statementRow(item) {
   }
 
   if (item.source === "purchase") {
-    action = `<button class="tiny ghost" data-edit-purchase="${item.id}">Editar</button>`;
+    action = `<button class="tiny ghost" data-edit-purchase="${item.id}">Editar</button><button class="tiny danger" data-delete-purchase="${item.id}">Excluir</button>`;
+  }
+
+  if (item.source === "fixed-card") {
+    action = `<button class="tiny ghost" data-edit-card-fixed="${item.id}">Editar</button>`;
   }
 
   if (item.source === "fixed") {
-    action = `<button class="tiny ghost" data-edit-fixed="${item.id}">Editar</button>`;
+    action = `<button class="tiny ghost" data-edit-fixed="${item.id}">Editar</button><button class="tiny ghost" data-toggle-fixed="${item.id}">${fixedIsPaid(item) ? "Reabrir" : "Pago"}</button>`;
+  }
+
+  if (item.source === "card-payment") {
+    action = `<button class="tiny danger" data-delete-card-payment="${item.id}">Excluir pagamento</button>`;
   }
 
   return row(item.title, `${date} - ${item.detail}`, item.value, action);
@@ -1592,11 +1650,9 @@ async function testRemoteSave() {
 
   if (!saved) return;
 
-  const { data, error } = await db
-    .from("duofin_v2_states")
-    .select("data")
-    .eq("household_id", householdId)
-    .maybeSingle();
+  const { data, error } = await db.rpc("duofin_v2_get_state", {
+    target_household: householdId
+  });
 
   if (error) {
     lastSaveError = error.message || String(error);
@@ -1604,7 +1660,7 @@ async function testRemoteSave() {
     return toast(`Erro ao ler teste: ${lastSaveError}`);
   }
 
-  const ok = data?.data?.meta?.saveTestAt === stamp;
+  const ok = data?.meta?.saveTestAt === stamp;
 
   toast(ok ? "Teste OK: Supabase salvou e leu." : "Teste falhou: dado nao voltou do Supabase.");
   renderSettings();
@@ -1719,11 +1775,14 @@ function renderSettings() {
       </div>
 
       ${row("Cofre v2", householdId || "nao carregado", 0)}
+      ${row("Usuario", user?.email || user?.id || "nao identificado", 0)}
+      ${row("Codigo do casal", inviteCode || "nao carregado", 0)}
       ${row("Dados", `Cartoes ${state.cards.length} - Lancamentos ${state.entries.length} - Compras ${state.cardPurchases.length}`, 0)}
       ${row("Ultimo salvo", lastSaved || "ainda nao salvou", 0)}
       ${row("Ultimo erro", lastSaveError || "nenhum", 0)}
       <div class="actions">
         <button class="tiny ghost" type="button" data-test-save>Testar salvamento</button>
+        <button class="tiny ghost" type="button" data-copy-code>Copiar codigo</button>
       </div>
     </section>
   `;
@@ -1806,6 +1865,10 @@ function select(name, label, options, selected = "") {
 
 function row(title, detail, value, action = "") {
   return `<div class="list-item"><div><strong>${title}</strong><span>${detail}</span></div><b>${Number(value) ? brl(value) : ""}</b>${action ? `<div class="actions">${action}</div>` : ""}</div>`;
+}
+
+function moneyRow(title, detail, value, action = "") {
+  return `<div class="list-item"><div><strong>${title}</strong><span>${detail}</span></div><b>${brl(value)}</b>${action ? `<div class="actions">${action}</div>` : ""}</div>`;
 }
 
 function empty(text) {
@@ -1993,6 +2056,7 @@ async function onClick(event) {
     });
 
     commit("Pagamento da fatura salvo.");
+    return;
   }
 
   const editEntry = event.target.closest("[data-edit-entry]");
@@ -2054,16 +2118,46 @@ async function onClick(event) {
     return;
   }
 
+  const deletePurchase = event.target.closest("[data-delete-purchase]");
+
+  if (deletePurchase && confirm("Excluir compra do cartao?")) {
+    state.cardPurchases = state.cardPurchases.filter((purchase) => purchase.id !== deletePurchase.dataset.deletePurchase);
+
+    if (editingPurchaseId === deletePurchase.dataset.deletePurchase) {
+      editingPurchaseId = "";
+    }
+
+    commit("Compra do cartao excluida.", "statement");
+    return;
+  }
+
+  const deletePayment = event.target.closest("[data-delete-card-payment]");
+
+  if (deletePayment && confirm("Excluir pagamento da fatura?")) {
+    state.cardPayments = state.cardPayments.filter((payment) => payment.id !== deletePayment.dataset.deleteCardPayment);
+    commit("Pagamento da fatura excluido.", "cards");
+    return;
+  }
+
   const deleteCard = event.target.closest("[data-delete-card]");
 
   if (deleteCard && confirm("Excluir cartao?")) {
+    const card = state.cards.find((item) => item.id === deleteCard.dataset.deleteCard);
+
     state.cards = state.cards.filter((card) => card.id !== deleteCard.dataset.deleteCard);
+
+    if (card) {
+      state.cardPurchases = state.cardPurchases.filter((purchase) => !same(purchase.card, card.name));
+      state.cardFixedBills = state.cardFixedBills.filter((bill) => !same(bill.card, card.name));
+      state.cardPayments = state.cardPayments.filter((payment) => !same(payment.card, card.name));
+    }
 
     if (editingCardId === deleteCard.dataset.deleteCard) {
       editingCardId = "";
     }
 
     commit("Cartao excluido.");
+    return;
   }
 
   const toggleFixed = event.target.closest("[data-toggle-fixed]");
@@ -2071,6 +2165,7 @@ async function onClick(event) {
   if (toggleFixed) {
     state.fixedBills = state.fixedBills.map((bill) => (bill.id === toggleFixed.dataset.toggleFixed ? togglePeriod(bill) : bill));
     commit("Status atualizado.");
+    return;
   }
 
   const editFixed = event.target.closest("[data-edit-fixed]");
@@ -2088,6 +2183,19 @@ async function onClick(event) {
     return;
   }
 
+  const deleteFixed = event.target.closest("[data-delete-fixed]");
+
+  if (deleteFixed && confirm("Excluir despesa fixa?")) {
+    state.fixedBills = state.fixedBills.filter((bill) => bill.id !== deleteFixed.dataset.deleteFixed);
+
+    if (editingFixedId === deleteFixed.dataset.deleteFixed) {
+      editingFixedId = "";
+    }
+
+    commit("Despesa fixa excluida.", "fixed");
+    return;
+  }
+
   const editCardFixed = event.target.closest("[data-edit-card-fixed]");
 
   if (editCardFixed) {
@@ -2100,6 +2208,19 @@ async function onClick(event) {
   if (event.target.closest("[data-cancel-card-fixed-edit]")) {
     editingCardFixedId = "";
     renderFixed();
+    return;
+  }
+
+  const deleteCardFixed = event.target.closest("[data-delete-card-fixed]");
+
+  if (deleteCardFixed && confirm("Excluir fixo no cartao?")) {
+    state.cardFixedBills = state.cardFixedBills.filter((bill) => bill.id !== deleteCardFixed.dataset.deleteCardFixed);
+
+    if (editingCardFixedId === deleteCardFixed.dataset.deleteCardFixed) {
+      editingCardFixedId = "";
+    }
+
+    commit("Fixo no cartao excluido.", "fixed");
     return;
   }
 

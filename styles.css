@@ -1032,7 +1032,25 @@ body::before {
 
 @media (max-width: 520px) {
   .app-shell {
-    padding: 16px 14px 108px;
+    padding: 14px 12px 116px;
+  }
+
+  .brand-logo {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+
+  .brand-row strong {
+    font-size: 19px;
+  }
+
+  .brand-row small {
+    font-size: 12px;
+  }
+
+  .period-row {
+    grid-template-columns: minmax(0, 1fr) 100px;
   }
 
   .hero-card {
@@ -1053,5 +1071,81 @@ body::before {
   .shortcut,
   .metric {
     border-radius: 22px;
+  }
+
+  .shortcut-grid,
+  .metrics {
+    gap: 10px;
+  }
+
+  .shortcut {
+    min-height: 86px;
+    padding: 14px;
+  }
+
+  .shortcut b {
+    width: 36px;
+    height: 36px;
+  }
+
+  .metric {
+    min-height: 92px;
+    padding: 14px;
+  }
+
+  .metric strong {
+    font-size: 22px;
+  }
+
+  .form-card,
+  .panel {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .list-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .list-item > b {
+    justify-self: start;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions .tiny {
+    flex: 1 1 118px;
+  }
+
+  .invoice-items span {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-lines {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bottom-nav {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .nav-item {
+    min-height: 54px;
+    border-radius: 16px;
+  }
+
+  .nav-item span {
+    font-size: 9px;
+  }
+
+  .privacy-toggle {
+    right: 12px;
+    bottom: 104px;
   }
 }
