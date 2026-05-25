@@ -73,10 +73,6 @@ body:not(.locked) .auth-screen {
   display: none;
 }
 
-.locked .privacy-toggle {
-  display: none;
-}
-
 .auth-screen {
   min-height: 100vh;
   display: grid;
@@ -582,7 +578,7 @@ body:not(.locked) .auth-screen {
 
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 6px;
   border-radius: 20px;
@@ -605,6 +601,14 @@ body:not(.locked) .auth-screen {
 .form-title {
   margin: 0;
   font-size: 24px;
+}
+
+.inner-form {
+  padding: 0;
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .list-item {
@@ -742,22 +746,6 @@ body:not(.locked) .auth-screen {
   font-weight: 850;
 }
 
-.privacy-toggle {
-  position: fixed;
-  right: 16px;
-  bottom: 104px;
-  z-index: 28;
-  min-width: 64px;
-  min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  color: #06111f;
-  background: linear-gradient(135deg, var(--green), var(--cyan), var(--blue));
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .32);
-  font-weight: 900;
-}
-
 @media (min-width: 780px) {
   .app-shell {
     max-width: 1180px;
@@ -888,7 +876,6 @@ body::before {
 .show-pass,
 .tabs button.active,
 .nav-item.active,
-.privacy-toggle,
 .shortcut b,
 .setup-step b {
   color: #06101e;
@@ -1148,8 +1135,12 @@ body::before {
     font-size: 9px;
   }
 
-  .privacy-toggle {
-    right: 12px;
-    bottom: 104px;
-  }
+}
+
+.inner-form {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }

@@ -449,7 +449,6 @@ function bindEvents() {
   document.addEventListener("change", onChange);
 
   $("#settings-open")?.addEventListener("click", toggleValues);
-  $("#privacy-toggle")?.addEventListener("click", toggleValues);
 
   ["click", "keydown", "touchstart", "scroll"].forEach((eventName) => {
     document.addEventListener(eventName, resetSessionTimer, { passive: true });
@@ -464,7 +463,6 @@ function updatePrivacyButtons() {
   const label = valuesHidden ? "Mostrar" : "Ocultar";
 
   if ($("#settings-open")) $("#settings-open").textContent = valuesHidden ? "Ver" : "Priv";
-  if ($("#privacy-toggle")) $("#privacy-toggle").textContent = label;
 
   document.body.classList.toggle("hide-values", valuesHidden);
 }
@@ -1262,7 +1260,7 @@ function metric(label, value, go = "") {
 }
 
 function renderLaunch() {
-  if (editingPurchaseId) launchType = "expense";
+  if (editingPurchaseId) launchType = "card";
 
   const editingEntry = state.entries.find((entry) => entry.id === editingEntryId);
 
@@ -1271,56 +1269,53 @@ function renderLaunch() {
   }
 
   const isIncome = launchType === "income";
+  const isExpense = launchType === "expense";
+  const isCard = launchType === "card";
   const editingPurchase = state.cardPurchases.find((purchase) => purchase.id === editingPurchaseId);
 
   $("#launch").innerHTML = `
     <section class="form-card wide">
-      <h2 class="form-title">${editingEntry ? "Editar lancamento" : "Lancamentos"}</h2>
+      <h2 class="form-title">${editingEntry ? "Editar lancamento" : editingPurchase ? "Editar compra no cartao" : "Lancamentos"}</h2>
 
       <div class="tabs">
         <button class="${isIncome ? "active" : ""}" data-launch-type="income" type="button">Entrada</button>
-        <button class="${!isIncome ? "active" : ""}" data-launch-type="expense" type="button">Saida</button>
+        <button class="${isExpense ? "active" : ""}" data-launch-type="expense" type="button">Saida</button>
+        <button class="${isCard ? "active" : ""}" data-launch-type="card" type="button">Cartao</button>
       </div>
 
-      <form id="entry-form" class="form-card">
-        ${input("value", "Valor", "number", editingEntry?.value || "", "step=\"0.01\" inputmode=\"decimal\" required")}
-        ${input("date", "Data", "date", editingEntry?.date || today(), "required")}
-        ${select("category", isIncome ? "Origem" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, editingEntry?.category || "")}
-        ${input("description", "Descricao", "text", editingEntry?.description || "", "required")}
-        ${select("person", "Quem?", people(), editingEntry?.person || "")}
-        ${!isIncome ? select("status", "Situacao", [["paid", "Pago"], ["pending", "Pendente"]], editingEntry?.status || "paid") : ""}
+      ${
+        !isCard
+          ? `<form id="entry-form" class="form-card inner-form">
+              ${input("value", "Valor", "number", editingEntry?.value || "", "step=\"0.01\" inputmode=\"decimal\" required")}
+              ${input("date", "Data", "date", editingEntry?.date || today(), "required")}
+              ${select("category", isIncome ? "Origem" : "Categoria", isIncome ? state.categoriesIncome : state.categoriesExpense, editingEntry?.category || "")}
+              ${input("description", "Descricao", "text", editingEntry?.description || "", "required")}
+              ${select("person", "Quem?", people(), editingEntry?.person || "")}
+              ${isExpense ? select("status", "Situacao", [["paid", "Pago"], ["pending", "Pendente"]], editingEntry?.status || "paid") : ""}
 
-        <button class="primary" type="submit">${editingEntry ? "Salvar alteracoes" : "Salvar lancamento"}</button>
+              <button class="primary" type="submit">${editingEntry ? "Salvar alteracoes" : isIncome ? "Salvar entrada" : "Salvar saida"}</button>
 
-        ${editingEntry ? `<button class="ghost" type="button" data-cancel-entry-edit>Cancelar edicao</button>` : ""}
-      </form>
+              ${editingEntry ? `<button class="ghost" type="button" data-cancel-entry-edit>Cancelar edicao</button>` : ""}
+            </form>`
+          : `<form id="card-purchase-form" class="form-card inner-form">
+              ${
+                state.cards.length
+                  ? select("card", "Cartao", cardNames(), editingPurchase?.card || "")
+                  : `<div class="empty"><strong>Nenhum cartao cadastrado</strong><span>Cadastre um cartao primeiro.</span></div>`
+              }
+
+              ${input("date", "Data da compra", "date", editingPurchase?.date || today(), "required")}
+              ${input("description", "Descricao", "text", editingPurchase?.description || "", "required")}
+              ${select("category", "Categoria", state.categoriesExpense, editingPurchase?.category || "")}
+              ${input("value", "Valor total", "number", editingPurchase?.value || "", "step=\"0.01\" inputmode=\"decimal\" required")}
+              ${input("parts", "Parcelas", "number", editingPurchase?.parts || "1", "min=\"1\" step=\"1\" required")}
+
+              <button class="primary" type="submit" ${state.cards.length ? "" : "disabled"}>${editingPurchase ? "Salvar alteracoes" : "Salvar compra no cartao"}</button>
+
+              ${editingPurchase ? `<button class="ghost" type="button" data-cancel-purchase-edit>Cancelar edicao</button>` : ""}
+            </form>`
+      }
     </section>
-
-    ${
-      !isIncome
-        ? `<section class="form-card wide">
-      <h2 class="form-title">${editingPurchase ? "Editar compra no cartao" : "Compra no cartao"}</h2>
-
-      <form id="card-purchase-form" class="form-card">
-        ${
-          state.cards.length
-            ? select("card", "Cartao", cardNames(), editingPurchase?.card || "")
-            : `<div class="empty"><strong>Nenhum cartao cadastrado</strong><span>Cadastre um cartao primeiro.</span></div>`
-        }
-
-        ${input("date", "Data da compra", "date", editingPurchase?.date || today(), "required")}
-        ${input("description", "Descricao", "text", editingPurchase?.description || "", "required")}
-        ${select("category", "Categoria", state.categoriesExpense, editingPurchase?.category || "")}
-        ${input("value", "Valor total", "number", editingPurchase?.value || "", "step=\"0.01\" inputmode=\"decimal\" required")}
-        ${input("parts", "Parcelas", "number", editingPurchase?.parts || "1", "min=\"1\" step=\"1\" required")}
-
-        <button class="primary" type="submit" ${state.cards.length ? "" : "disabled"}>${editingPurchase ? "Salvar alteracoes" : "Salvar compra"}</button>
-
-        ${editingPurchase ? `<button class="ghost" type="button" data-cancel-purchase-edit>Cancelar edicao</button>` : ""}
-      </form>
-    </section>`
-        : ""
-    }
   `;
 }
 
@@ -2043,6 +2038,11 @@ async function onClick(event) {
   const launch = event.target.closest("[data-launch-type]");
 
   if (launch) {
+    if (launch.dataset.launchType !== launchType) {
+      editingEntryId = "";
+      editingPurchaseId = "";
+    }
+
     launchType = launch.dataset.launchType;
     renderLaunch();
     return;
@@ -2239,7 +2239,8 @@ async function onClick(event) {
 
   if (editPurchase) {
     editingPurchaseId = editPurchase.dataset.editPurchase;
-    launchType = "expense";
+    editingEntryId = "";
+    launchType = "card";
     renderLaunch();
     setView("launch");
     return;
