@@ -1,17 +1,15 @@
 {
-  "name": "DuoFin",
+  "name": "DuoFin v2",
   "short_name": "DuoFin",
-  "description": "Controle financeiro compartilhado para casal.",
-  "start_url": ".",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#071225",
-  "theme_color": "#071225",
+  "background_color": "#06111f",
+  "theme_color": "#06111f",
   "icons": [
     {
       "src": "app-icon.svg",
       "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/svg+xml"
     }
   ]
 }

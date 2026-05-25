@@ -2,117 +2,58 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#071225">
-    <title>DuoFin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#06111f">
+    <title>DuoFin v2</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="app-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=7">
   </head>
-  <body class="auth-locked">
-    <section class="auth-screen" id="auth-screen"></section>
+  <body class="locked" data-view="home">
+    <section id="auth" class="auth-screen"></section>
 
-    <aside class="sidebar app-frame">
-      <div class="brand">
-        <span class="brand-mark">DF</span>
-        <div>
-          <strong>DuoFin</strong>
-          <small>Controle compartilhado</small>
-        </div>
-      </div>
-      <nav class="tabs" aria-label="Seções">
-        <button class="tab active" data-view="dashboard" title="Visão geral">⌂ <span>Visão geral</span></button>
-        <button class="tab" data-view="entries" title="Lançamentos">＋ <span>Lançamentos</span></button>
-        <button class="tab" data-view="statement" title="Extrato">☷ <span>Extrato</span></button>
-        <button class="tab" data-view="fixed" title="Contas Fixas">◷ <span>Contas Fixas</span></button>
-        <button class="tab" data-view="agenda" title="Agenda">◌ <span>Agenda</span></button>
-        <button class="tab" data-view="cards" title="Cartões">▣ <span>Cartões</span></button>
-        <button class="tab" data-view="accounts" title="Nossa Carteira">≋ <span>Carteira</span></button>
-        <button class="tab" data-view="method" title="50/30/20">◴ <span>50/30/20</span></button>
-        <button class="tab" data-view="goals" title="Metas">◇ <span>Metas</span></button>
-        <button class="tab" data-view="settings" title="Cadastros">⚙ <span>Cadastros</span></button>
-      </nav>
-    </aside>
-
-    <main class="shell app-frame">
-      <header class="topbar">
-        <div>
-          <div class="mobile-app-brand">
-            <span class="brand-mark">DF</span>
-            <div>
-              <strong>DuoFin</strong>
-              <small>Controle compartilhado</small>
-            </div>
+    <main id="app" class="app-shell">
+      <header class="app-head">
+        <div class="brand-row">
+          <img class="brand-logo" src="app-icon.svg" alt="DuoFin">
+          <div>
+            <strong>DuoFin</strong>
+            <small>Controle compartilhado</small>
           </div>
-          <p class="eyebrow">Baseado na planilha</p>
-          <h1 id="page-title">Visão geral</h1>
+          <button id="settings-open" class="icon-button" type="button" aria-label="Configuracoes">Config</button>
         </div>
-        <div class="top-actions">
-          <div class="cloud-panel" id="cloud-panel"></div>
-          <label class="field compact">
-            <span>Mês</span>
-            <select id="month-filter"></select>
+        <div class="period-row">
+          <label>
+            <span>Mes</span>
+            <select id="month-select"></select>
+          </label>
+          <label>
+            <span>Ano</span>
+            <select id="year-select"></select>
           </label>
         </div>
       </header>
-      <div class="period-switcher" id="period-switcher"></div>
 
-      <section class="view active" id="dashboard"></section>
-      <section class="view" id="entries"></section>
-      <section class="view" id="statement"></section>
-      <section class="view" id="fixed"></section>
-      <section class="view" id="agenda"></section>
-      <section class="view" id="cards"></section>
-      <section class="view" id="accounts"></section>
-      <section class="view" id="method"></section>
-      <section class="view" id="goals"></section>
-      <section class="view" id="settings"></section>
-      <section class="view" id="more">
-        <section class="more-hero">
-          <div>
-            <span>Menu do casal</span>
-            <h2>Organize sem lotar a tela inicial</h2>
-            <p>As áreas de consulta e configuração ficam aqui, separadas por assunto.</p>
-          </div>
-        </section>
-        <div class="more-sections">
-          <section class="more-section">
-            <h2>Acompanhar</h2>
-            <div class="more-grid">
-              <button class="more-card cyan" type="button" data-view="agenda"><b>◌</b><span><strong>Agenda</strong><small>Vencimentos, faturas e metas com data</small></span></button>
-              <button class="more-card blue" type="button" data-view="cards"><b>▣</b><span><strong>Cartões</strong><small>Cadastro e detalhes das faturas</small></span></button>
-              <button class="more-card cyan" type="button" data-view="accounts"><b>≋</b><span><strong>Carteira</strong><small>Onde o dinheiro fica</small></span></button>
-            </div>
-          </section>
-          <section class="more-section">
-            <h2>Planejar</h2>
-            <div class="more-grid">
-              <button class="more-card pink" type="button" data-view="goals"><b>◇</b><span><strong>Metas</strong><small>Objetivos do casal</small></span></button>
-              <button class="more-card gold" type="button" data-view="method"><b>◴</b><span><strong>50/30/20</strong><small>Planejamento automático pela renda</small></span></button>
-            </div>
-          </section>
-          <section class="more-section">
-            <h2>Sistema</h2>
-            <div class="more-grid">
-              <button class="more-card cyan" type="button" data-install-help><b>⇩</b><span><strong>Instalar no celular</strong><small>Atalho para Android e iPhone</small></span></button>
-              <button class="more-card violet" type="button" data-view="settings"><b>⚙</b><span><strong>Configurações</strong><small>Perfil, convite, backup e categorias</small></span></button>
-            </div>
-          </section>
-        </div>
-      </section>
+      <section id="home" class="view active"></section>
+      <section id="launch" class="view"></section>
+      <section id="cards" class="view"></section>
+      <section id="fixed" class="view"></section>
+      <section id="statement" class="view"></section>
+      <section id="settings" class="view"></section>
     </main>
 
-    <button class="fab app-frame" id="quick-add" type="button" title="Adicionar lançamento">＋</button>
-    <div class="modal-backdrop" id="app-modal"></div>
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-go="home" type="button"><b>In</b><span>Inicio</span></button>
+      <button class="nav-item" data-go="launch" type="button"><b>+</b><span>Lancar</span></button>
+      <button class="nav-item" data-go="cards" type="button"><b>CC</b><span>Cartoes</span></button>
+      <button class="nav-item" data-go="fixed" type="button"><b>Fx</b><span>Fixos</span></button>
+      <button class="nav-item" data-go="statement" type="button"><b>Ex</b><span>Extrato</span></button>
+      <button class="nav-item" data-go="settings" type="button"><b>...</b><span>Mais</span></button>
+    </nav>
 
-    <template id="empty-state">
-      <div class="empty">
-        <strong>Nenhum item cadastrado</strong>
-        <span>Adicione o primeiro registro no formulário acima.</span>
-      </div>
-    </template>
+    <div id="toast" class="toast" hidden></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=7"></script>
   </body>
 </html>
