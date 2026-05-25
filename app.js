@@ -1016,7 +1016,17 @@ function summary() {
   const income = total(entries.filter((entry) => entry.type === "income")) + monthSalary();
   const expense = total(entries.filter((entry) => entry.type === "expense" && entry.status === "paid"));
   const cards = total(state.cards.map((card) => ({ value: cardInvoice(card.name).amount })));
-  const cardsForBalance = total(state.cards.filter(cardAffectsBalance).map((card) => ({ value: cardInvoice(card.name).open })));
+  const cardsPaid = total(state.cards.map((card) => ({ value: cardInvoice(card.name).paid })));
+  const cardsOpen = total(state.cards.map((card) => ({ value: cardInvoice(card.name).open })));
+  const cardsForBalance = total(
+    state.cards.map((card) => {
+      const invoice = cardInvoice(card.name);
+
+      return {
+        value: cardAffectsBalance(card) ? invoice.amount : invoice.paid
+      };
+    })
+  );
   const fixedPaid = total(state.fixedBills.filter((bill) => fixedIsPaid(bill)));
   const fixedPending = total(state.fixedBills.filter((bill) => bill.active !== false && !fixedIsPaid(bill)));
   const goalsSaved = total(state.goals.map((goal) => ({ value: goal.saved || goal.current || 0 })));
@@ -1026,6 +1036,8 @@ function summary() {
     income,
     expense,
     cards,
+    cardsPaid,
+    cardsOpen,
     cardsForBalance,
     fixedPaid,
     fixedPending,
@@ -1185,7 +1197,9 @@ function renderHome() {
       ${moneyRow("Renda cadastrada", "Salarios do casal no mes", data.plannedIncome)}
       ${moneyRow("Fixas pagas", "Contas marcadas como pagas", data.fixedPaid)}
       ${moneyRow("Fixas pendentes", "Ainda falta pagar neste mes", data.fixedPending)}
-      ${moneyRow("Faturas abertas", "Cartoes que ainda precisam de atencao", total(invoices.map((item) => ({ value: item.invoice.open }))))}
+      ${moneyRow("Faturas pagas", "Valor ja descontado do saldo", data.cardsPaid)}
+      ${moneyRow("Faturas abertas", "Cartoes que ainda precisam de atencao", data.cardsOpen)}
+      ${moneyRow(data.balance >= 0 ? "Sobra do mes" : "Faltou no mes", data.balance >= 0 ? "Dinheiro que ainda sobrou neste periodo" : "Valor que passou do disponivel", Math.abs(data.balance))}
       ${moneyRow("Guardado em metas", "Total informado nas metas", data.goalsSaved)}
     </section>
 
