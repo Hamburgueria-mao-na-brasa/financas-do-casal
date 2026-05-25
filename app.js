@@ -24,6 +24,8 @@ let lastSaveError = "";
 let saveQueue = Promise.resolve();
 let sessionTimer = null;
 const SESSION_UNLOCK_KEY = "duofinV2Unlocked";
+const LAST_ACTIVITY_KEY = "duofinV2LastActivity";
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -414,22 +416,21 @@ async function init() {
     return renderAuth("Entre novamente para continuar.");
   }
 
-  if (sessionStorage.getItem(SESSION_UNLOCK_KEY) !== "1") {
-    await db.auth.signOut();
-    user = null;
-    householdId = "";
-    inviteCode = "";
-    return renderAuth("Entre para acessar seu DuoFin.");
-  }
-
   const { data } = await db.auth.getSession();
   user = data.session?.user || null;
+
+  if (user && sessionExpired()) {
+    await hardSignOut("Sessao expirada. Entre novamente.");
+    return;
+  }
 
   db.auth.onAuthStateChange(async (_event, session) => {
     user = session?.user || null;
 
-    if (user) {
+    if (user && !sessionExpired()) {
       await loadApp();
+    } else if (user) {
+      await hardSignOut("Sessao expirada. Entre novamente.");
     } else {
       renderAuth();
     }
@@ -479,11 +480,25 @@ function toggleValues() {
 function resetSessionTimer() {
   if (!user) return;
 
+  markActivity();
   clearTimeout(sessionTimer);
 
   sessionTimer = setTimeout(() => {
     hardSignOut("Sessao encerrada apos 10 minutos sem uso.");
-  }, 10 * 60 * 1000);
+  }, SESSION_TIMEOUT_MS);
+}
+
+function markActivity() {
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+  sessionStorage.setItem(SESSION_UNLOCK_KEY, "1");
+}
+
+function sessionExpired() {
+  const lastActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0);
+
+  if (!lastActivity) return false;
+
+  return Date.now() - lastActivity > SESSION_TIMEOUT_MS;
 }
 
 function setCurrentPeriod() {
@@ -498,6 +513,7 @@ async function hardSignOut(message = "Entre novamente para continuar.") {
   } catch (_error) {}
 
   sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+  localStorage.removeItem(LAST_ACTIVITY_KEY);
 
   Object.keys(localStorage).forEach((key) => {
     if (key.startsWith("sb-") || key.startsWith("duofinV2HouseholdId") || key.startsWith("duofinV2InviteCode")) {
@@ -568,6 +584,7 @@ async function login(form) {
   }
 
   sessionStorage.setItem(SESSION_UNLOCK_KEY, "1");
+  markActivity();
 
   if (authData?.user) {
     user = authData.user;
@@ -609,6 +626,62 @@ function authMessage(message) {
   return message || "Nao foi possivel entrar.";
 }
 
+function missingFunction(error, name) {
+  return Boolean(error && new RegExp(`function public\\.${name}|${name}`, "i").test(error.message || ""));
+}
+
+async function remoteGetState() {
+  const rpcResult = await db.rpc("duofin_v2_get_state", {
+    target_household: householdId
+  });
+
+  if (!rpcResult.error) {
+    return {
+      data: rpcResult.data || {},
+      error: null
+    };
+  }
+
+  if (!missingFunction(rpcResult.error, "duofin_v2_get_state")) {
+    return rpcResult;
+  }
+
+  const tableResult = await db
+    .from("duofin_v2_states")
+    .select("data")
+    .eq("household_id", householdId)
+    .maybeSingle();
+
+  return {
+    data: tableResult.data?.data || {},
+    error: tableResult.error || null
+  };
+}
+
+async function remoteSaveState(payload) {
+  const rpcResult = await db.rpc("duofin_v2_save_state", {
+    target_household: householdId,
+    payload
+  });
+
+  if (!rpcResult.error || !missingFunction(rpcResult.error, "duofin_v2_save_state")) {
+    return rpcResult;
+  }
+
+  return db
+    .from("duofin_v2_states")
+    .upsert(
+      {
+        household_id: householdId,
+        data: payload,
+        updated_at: new Date().toISOString()
+      },
+      {
+        onConflict: "household_id"
+      }
+    );
+}
+
 async function loadApp() {
   unlockApp(true);
 
@@ -620,9 +693,7 @@ async function loadApp() {
 
     await ensureHousehold();
 
-    const { data, error } = await db.rpc("duofin_v2_get_state", {
-      target_household: householdId
-    });
+    const { data, error } = await remoteGetState();
 
     if (error) throw error;
 
@@ -812,10 +883,7 @@ async function saveState(showToast = false) {
     return false;
   }
 
-  const { error } = await db.rpc("duofin_v2_save_state", {
-    target_household: householdId,
-    payload: state
-  });
+  const { error } = await remoteSaveState(state);
 
   if (error) {
     console.error("Erro ao salvar no Supabase:", error);
@@ -1683,9 +1751,7 @@ async function testRemoteSave() {
 
   if (!saved) return;
 
-  const { data, error } = await db.rpc("duofin_v2_get_state", {
-    target_household: householdId
-  });
+  const { data, error } = await remoteGetState();
 
   if (error) {
     lastSaveError = error.message || String(error);
