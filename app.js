@@ -23,6 +23,7 @@ let lastSaved = "";
 let lastSaveError = "";
 let saveQueue = Promise.resolve();
 let sessionTimer = null;
+const SESSION_UNLOCK_KEY = "duofinV2Unlocked";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -400,6 +401,7 @@ async function init() {
 
   if (params.has("sair") || params.has("login") || params.has("logout")) {
     await db.auth.signOut();
+    sessionStorage.removeItem(SESSION_UNLOCK_KEY);
 
     localStorage.removeItem("duofinV2HouseholdId");
     localStorage.removeItem("duofinV2InviteCode");
@@ -410,6 +412,14 @@ async function init() {
     history.replaceState({}, document.title, location.pathname);
 
     return renderAuth("Entre novamente para continuar.");
+  }
+
+  if (sessionStorage.getItem(SESSION_UNLOCK_KEY) !== "1") {
+    await db.auth.signOut();
+    user = null;
+    householdId = "";
+    inviteCode = "";
+    return renderAuth("Entre para acessar seu DuoFin.");
   }
 
   const { data } = await db.auth.getSession();
@@ -487,6 +497,8 @@ async function hardSignOut(message = "Entre novamente para continuar.") {
     await db?.auth?.signOut();
   } catch (_error) {}
 
+  sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+
   Object.keys(localStorage).forEach((key) => {
     if (key.startsWith("sb-") || key.startsWith("duofinV2HouseholdId") || key.startsWith("duofinV2InviteCode")) {
       localStorage.removeItem(key);
@@ -548,10 +560,18 @@ async function login(form) {
 
   localStorage.setItem("duofinV2Email", email);
 
-  const { error } = await db.auth.signInWithPassword({ email, password });
+  const { data: authData, error } = await db.auth.signInWithPassword({ email, password });
 
   if (error) {
     renderAuth(authMessage(error.message));
+    return;
+  }
+
+  sessionStorage.setItem(SESSION_UNLOCK_KEY, "1");
+
+  if (authData?.user) {
+    user = authData.user;
+    await loadApp();
   }
 }
 
@@ -1020,6 +1040,31 @@ function unreadNotifications() {
     .slice(0, 5);
 }
 
+function notificationList(limit = 20, unreadOnly = false) {
+  const uid = user?.id || "";
+
+  return (state.notifications || [])
+    .filter((item) => !unreadOnly || !uid || !(item.readBy || []).includes(uid))
+    .slice(0, limit);
+}
+
+function notificationHtml(item) {
+  const uid = user?.id || "";
+  const read = uid && (item.readBy || []).includes(uid);
+
+  return `
+    <button class="notification-item ${read ? "read" : ""}" data-read-notification="${item.id}" type="button">
+      <strong>${item.message}</strong>
+      <span>${new Date(item.createdAt).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      })}${read ? " - lida" : ""}</span>
+    </button>
+  `;
+}
+
 function renderHome() {
   const data = summary();
   const tight = data.income > 0 && data.balance <= data.income * 0.12;
@@ -1085,19 +1130,7 @@ function renderHome() {
         <h2>Notificacoes</h2>
         <div class="notification-list">
           ${alerts
-            .map(
-              (item) => `
-            <button class="notification-item" data-read-notification="${item.id}" type="button">
-              <strong>${item.message}</strong>
-              <span>${new Date(item.createdAt).toLocaleString("pt-BR", {
-                day: "2-digit",
-                month: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit"
-              })}</span>
-            </button>
-          `
-            )
+            .map(notificationHtml)
             .join("")}
         </div>
       </section>
@@ -1667,6 +1700,9 @@ async function testRemoteSave() {
 }
 
 function renderSettings() {
+  const allNotifications = notificationList(20, false);
+  const unreadCount = notificationList(100, true).length;
+
   $("#settings").innerHTML = `
     <section class="panel wide">
       <div class="section-head">
@@ -1680,6 +1716,20 @@ function renderSettings() {
         <button class="menu-card" data-go="fixed" type="button"><strong>Despesas fixas</strong><span>Contas mensais e fixos no cartao.</span></button>
         <button class="menu-card" data-go="statement" type="button"><strong>Extrato</strong><span>Tudo que entrou no mes escolhido.</span></button>
       </div>
+    </section>
+
+    <section class="panel wide">
+      <div class="section-head">
+        <span>${unreadCount ? `${unreadCount} nova${unreadCount > 1 ? "s" : ""}` : "Tudo visto"}</span>
+        <h2>Notificacoes</h2>
+      </div>
+
+      ${
+        allNotifications.length
+          ? `<div class="notification-list">${allNotifications.map(notificationHtml).join("")}</div>
+             <div class="actions"><button class="tiny ghost" type="button" data-mark-all-notifications>Marcar tudo como lido</button></div>`
+          : empty("Nenhuma notificacao ainda")
+      }
     </section>
 
     <section class="form-card wide">
@@ -2023,6 +2073,23 @@ async function onClick(event) {
     saveState(false);
     setView(note.view || "home");
     render();
+    return;
+  }
+
+  if (event.target.closest("[data-mark-all-notifications]")) {
+    const uid = user?.id;
+
+    if (!uid) return;
+
+    state.notifications = (state.notifications || []).map((item) => {
+      const readBy = new Set(item.readBy || []);
+      readBy.add(uid);
+      return { ...item, readBy: Array.from(readBy) };
+    });
+
+    await saveState(false);
+    render();
+    toast("Notificacoes marcadas como lidas.");
     return;
   }
 

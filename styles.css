@@ -1007,6 +1007,10 @@ body::before {
     linear-gradient(180deg, rgba(0, 212, 201, .16), rgba(20, 27, 45, .82));
 }
 
+.notification-item.read {
+  opacity: .58;
+}
+
 .bottom-nav {
   border-color: rgba(242, 244, 247, .12);
   background: rgba(6, 10, 18, .86);
