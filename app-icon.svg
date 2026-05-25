@@ -1,28 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DuoFin">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="navy" x1="74" x2="250" y1="110" y2="402" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#083c76"/>
-      <stop offset="1" stop-color="#061a36"/>
+    <linearGradient id="bg" x1="70" y1="54" x2="438" y2="462" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071225"/>
+      <stop offset=".52" stop-color="#193a8a"/>
+      <stop offset="1" stop-color="#7b5cff"/>
     </linearGradient>
-    <linearGradient id="aqua" x1="230" x2="430" y1="128" y2="368" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22d7b8"/>
-      <stop offset=".55" stop-color="#12bfa3"/>
-      <stop offset="1" stop-color="#067f78"/>
+    <linearGradient id="mark" x1="132" y1="122" x2="382" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffbd2f"/>
+      <stop offset=".48" stop-color="#13d8ff"/>
+      <stop offset="1" stop-color="#7b5cff"/>
     </linearGradient>
-    <linearGradient id="tile" x1="86" x2="426" y1="66" y2="446" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eef4f8"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#06111f" flood-opacity=".18"/>
-    </filter>
   </defs>
-
-  <rect x="58" y="58" width="396" height="396" rx="88" fill="url(#tile)" filter="url(#shadow)"/>
-
-  <g transform="translate(68 102)">
-    <path fill="url(#navy)" d="M34 0h111c92 0 154 61 154 151S237 302 145 302H34V0Zm80 75v152h31c47 0 74-30 74-76s-27-76-74-76h-31Z"/>
-    <path fill="url(#aqua)" d="M244 0h164l-20 75H287c-25 0-43 10-58 31l-36 51c-16 22-34 38-56 48v-74c10-6 19-16 29-30l39-55C216 17 232 0 244 0Zm29 128h115l-19 72H273v102h-80V191c25-10 43-26 58-47l22-16Z"/>
-    <path fill="#18c7a8" d="M94 204h24v38H94v-38Zm38-32h24v70h-24v-70Zm39-34h24v104h-24V138Z"/>
-  </g>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="392" cy="116" r="76" fill="#13d8ff" opacity=".18"/>
+  <circle cx="98" cy="398" r="104" fill="#ffbd2f" opacity=".16"/>
+  <path d="M132 306c0-72 48-126 112-126 38 0 70 17 90 45 16-12 36-19 59-19 55 0 91 42 91 100 0 77-73 128-229 128S132 383 132 306Z" fill="#ffffff" opacity=".11"/>
+  <path d="M152 154h96c78 0 132 42 132 103 0 63-54 105-132 105h-96V154Zm78 65v78h18c34 0 54-14 54-40s-20-38-54-38h-18Z" fill="url(#mark)"/>
+  <path d="M336 154h82v65h-82v56h70v63h-70v24h-78V154h78Z" fill="#f8fbff"/>
+  <path d="M154 380h218" stroke="#13d8ff" stroke-width="24" stroke-linecap="round" opacity=".85"/>
 </svg>
