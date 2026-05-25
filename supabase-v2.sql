@@ -54,6 +54,14 @@ for select
 to authenticated
 using (public.duofin_v2_is_member(id) or created_by = auth.uid());
 
+drop policy if exists "duofin_v2_households_update" on public.duofin_v2_households;
+create policy "duofin_v2_households_update"
+on public.duofin_v2_households
+for update
+to authenticated
+using (public.duofin_v2_is_member(id) or created_by = auth.uid())
+with check (public.duofin_v2_is_member(id) or created_by = auth.uid());
+
 drop policy if exists "duofin_v2_members_select" on public.duofin_v2_members;
 create policy "duofin_v2_members_select"
 on public.duofin_v2_members
