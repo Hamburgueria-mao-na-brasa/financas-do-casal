@@ -1,28 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DuoFin">
   <defs>
-    <linearGradient id="navy" x1="74" x2="250" y1="110" y2="402" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#083c76"/>
-      <stop offset="1" stop-color="#061a36"/>
+    <linearGradient id="tile" x1="72" x2="430" y1="48" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#141b2d"/>
+      <stop offset=".48" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#090d18"/>
     </linearGradient>
-    <linearGradient id="aqua" x1="230" x2="430" y1="128" y2="368" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22d7b8"/>
-      <stop offset=".55" stop-color="#12bfa3"/>
-      <stop offset="1" stop-color="#067f78"/>
+    <linearGradient id="mark" x1="126" x2="392" y1="104" y2="410" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#25d6ff"/>
+      <stop offset=".42" stop-color="#2563eb"/>
+      <stop offset=".72" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#00d4c9"/>
     </linearGradient>
-    <linearGradient id="tile" x1="86" x2="426" y1="66" y2="446" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eef4f8"/>
+    <linearGradient id="shine" x1="152" x2="300" y1="130" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2f4f7" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#f2f4f7" stop-opacity="0"/>
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#06111f" flood-opacity=".18"/>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="#2563eb" flood-opacity=".75"/>
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#000000" flood-opacity=".42"/>
     </filter>
   </defs>
 
-  <rect x="58" y="58" width="396" height="396" rx="88" fill="url(#tile)" filter="url(#shadow)"/>
+  <rect x="56" y="56" width="400" height="400" rx="92" fill="url(#tile)"/>
+  <rect x="72" y="72" width="368" height="368" rx="78" fill="none" stroke="#f2f4f7" stroke-opacity=".08"/>
 
-  <g transform="translate(68 102)">
-    <path fill="url(#navy)" d="M34 0h111c92 0 154 61 154 151S237 302 145 302H34V0Zm80 75v152h31c47 0 74-30 74-76s-27-76-74-76h-31Z"/>
-    <path fill="url(#aqua)" d="M244 0h164l-20 75H287c-25 0-43 10-58 31l-36 51c-16 22-34 38-56 48v-74c10-6 19-16 29-30l39-55C216 17 232 0 244 0Zm29 128h115l-19 72H273v102h-80V191c25-10 43-26 58-47l22-16Z"/>
-    <path fill="#18c7a8" d="M94 204h24v38H94v-38Zm38-32h24v70h-24v-70Zm39-34h24v104h-24V138Z"/>
+  <g filter="url(#glow)">
+    <path fill="url(#mark)" d="M138 126h104c84 0 144 55 144 130 0 76-60 130-144 130H138V126Zm72 68v124h34c41 0 68-24 68-62s-27-62-68-62h-34Z"/>
+    <path fill="url(#tile)" d="M210 194h35c40 0 67 24 67 62s-27 62-67 62h-35V194Z" opacity=".96"/>
+    <path fill="url(#mark)" d="M278 118h112l-21 69h-53c-22 0-37 8-51 27l-50 70c-19 26-43 47-73 61v-77c10-8 20-19 31-34l51-72c16-23 32-37 54-44Z"/>
+    <path fill="url(#shine)" d="M152 140h86c56 0 101 27 122 70-42-31-89-43-145-42h-63v-28Z"/>
   </g>
+
+  <path fill="#00d4c9" d="M168 286h18v36h-18v-36Zm30-27h18v63h-18v-63Zm31-31h18v94h-18v-94Z"/>
 </svg>
