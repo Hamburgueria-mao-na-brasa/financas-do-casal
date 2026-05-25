@@ -1136,11 +1136,3 @@ body::before {
   }
 
 }
-
-.inner-form {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}

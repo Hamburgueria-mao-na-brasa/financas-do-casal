@@ -21,6 +21,7 @@ let valuesHidden = localStorage.getItem("duofinV2HideValues") === "1";
 let state = emptyState();
 let lastSaved = "";
 let lastSaveError = "";
+let lastSaveMode = "";
 let saveQueue = Promise.resolve();
 let sessionTimer = null;
 const SESSION_UNLOCK_KEY = "duofinV2Unlocked";
@@ -42,6 +43,10 @@ function localStateKey() {
   return householdId ? `duofinV2Local:${householdId}` : "duofinV2Local";
 }
 
+function localPendingKey() {
+  return `${localStateKey()}:pending`;
+}
+
 function rememberHousehold() {
   if (!householdId) return;
 
@@ -56,6 +61,13 @@ function rememberHousehold() {
 
 function hasFinancialData(data) {
   return ["cards", "entries", "cardPurchases", "fixedBills", "cardFixedBills", "cardPayments", "goals"].some((key) => Array.isArray(data?.[key]) && data[key].length);
+}
+
+function stateStamp(data) {
+  const value = data?.meta?.localSavedAt || data?.meta?.remoteSavedAt || "";
+  const time = Date.parse(value);
+
+  return Number.isFinite(time) ? time : 0;
 }
 
 function readLocalBackup() {
@@ -74,6 +86,10 @@ function readLocalBackup() {
   }
 
   return null;
+}
+
+function hasPendingLocalSave() {
+  return localStorage.getItem(localPendingKey()) === "1";
 }
 
 function emptyState() {
@@ -698,11 +714,12 @@ async function loadApp() {
     state = normalize(data || {});
 
     const localBackup = readLocalBackup();
+    const localIsNewer = localBackup && stateStamp(localBackup) > stateStamp(state);
 
-    if (!hasFinancialData(state) && localBackup) {
+    if (localBackup && (!hasFinancialData(state) || hasPendingLocalSave() || localIsNewer)) {
       state = localBackup;
-      await saveState(true);
-      toast("Dados locais recuperados neste aparelho.");
+      const saved = await saveState(false);
+      toast(saved ? "Dados locais recuperados e sincronizados." : "Dados locais recuperados neste aparelho.");
     }
 
     setCurrentPeriod();
@@ -871,13 +888,22 @@ async function changeInviteCode() {
 
 async function saveState(showToast = false) {
   state = normalize(state);
+  const now = new Date().toISOString();
+
+  state.meta = {
+    ...(state.meta || {}),
+    localSavedAt: now,
+    lastSavedBy: user?.email || user?.id || ""
+  };
 
   localStorage.setItem(localStateKey(), JSON.stringify(state));
+  localStorage.setItem(localPendingKey(), "1");
 
   if (!householdId) {
     lastSaveError = "Cofre nao carregado.";
+    lastSaveMode = "aparelho";
     renderHeaderStatus();
-    toast(`Erro ao salvar: ${lastSaveError}`);
+    toast(`Salvo no aparelho. Erro no Supabase: ${lastSaveError}`);
     return false;
   }
 
@@ -886,12 +912,17 @@ async function saveState(showToast = false) {
   if (error) {
     console.error("Erro ao salvar no Supabase:", error);
     lastSaveError = error.message || String(error);
+    lastSaveMode = "aparelho";
     renderHeaderStatus();
-    toast(`Erro ao salvar: ${lastSaveError}`);
+    toast(`Salvo no aparelho. Supabase falhou: ${lastSaveError}`);
     return false;
   }
 
   lastSaveError = "";
+  lastSaveMode = "supabase";
+  state.meta.remoteSavedAt = new Date().toISOString();
+  localStorage.setItem(localStateKey(), JSON.stringify(state));
+  localStorage.removeItem(localPendingKey());
   lastSaved = new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit"
@@ -931,7 +962,7 @@ function commit(message, view = activeView) {
     .catch(() => {})
     .then(async () => {
       const saved = await saveState(false);
-      toast(saved ? `${message} Salvo.` : "Nao salvou. Veja o erro mostrado.");
+      toast(saved ? `${message} Salvo.` : `${message} Salvo neste aparelho. Falta sincronizar.`);
       return saved;
     });
 
@@ -955,7 +986,11 @@ function render() {
 }
 
 function renderHeaderStatus() {
-  $(".brand-row small").textContent = lastSaveError ? "Erro ao salvar" : lastSaved ? `Salvo ${lastSaved}` : "Controle compartilhado";
+  $(".brand-row small").textContent = lastSaveError
+    ? "Salvo no aparelho"
+    : lastSaved
+      ? `Salvo ${lastSaved}`
+      : "Controle compartilhado";
 }
 
 function renderPeriodSelects() {
@@ -1904,6 +1939,7 @@ function renderSettings() {
       ${row("Codigo do casal", inviteCode || "nao carregado", 0)}
       ${row("Dados", `Cartoes ${state.cards.length} - Lancamentos ${state.entries.length} - Compras ${state.cardPurchases.length}`, 0)}
       ${row("Ultimo salvo", lastSaved || "ainda nao salvou", 0)}
+      ${row("Onde salvou", lastSaveMode === "supabase" ? "Supabase" : hasPendingLocalSave() ? "Aparelho - pendente de sincronizar" : "Aguardando teste", 0)}
       ${row("Ultimo erro", lastSaveError || "nenhum", 0)}
       <div class="actions">
         <button class="tiny ghost" type="button" data-test-save>Testar salvamento</button>
