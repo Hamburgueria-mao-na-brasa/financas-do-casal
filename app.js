@@ -792,18 +792,10 @@ async function saveState(showToast = false) {
     return false;
   }
 
-  const { error } = await db
-    .from("duofin_v2_states")
-    .upsert(
-      {
-        household_id: householdId,
-        data: state,
-        updated_at: new Date().toISOString()
-      },
-      {
-        onConflict: "household_id"
-      }
-    );
+  const { error } = await db.rpc("duofin_v2_save_state", {
+    target_household: householdId,
+    payload: state
+  });
 
   if (error) {
     console.error("Erro ao salvar no Supabase:", error);
